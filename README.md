@@ -173,7 +173,7 @@ S3_ACCESS_KEY_ID=
 S3_SECRET_ACCESS_KEY=
 ```
 
-> ⚠️ **IMPORTANTE**: no subas el archivo `.env` a repositorios públicos.
+
 
 ---
 
@@ -328,7 +328,7 @@ Otros modos (`s3`, `local`) están preparados a nivel de código pero no impleme
 
 ### 7.1. Login
 
-1. Asegúrate de tener el usuario seed:
+1. Es necesario tener el usuario seed:
 
    - Email: `test@test.com`
    - Password: `12345678`
