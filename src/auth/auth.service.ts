@@ -2,12 +2,15 @@ import { Injectable, UnauthorizedException } from "@nestjs/common";
 import * as bcrypt from "bcrypt";
 import { JwtService } from "@nestjs/jwt";
 import { UsersService } from "../users/users.service";
+import { randomUUID } from "crypto";
+import { ConfigService } from "@nestjs/config";
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly usersService: UsersService,
-    private readonly jwtService: JwtService
+    private readonly jwtService: JwtService,
+    private readonly config: ConfigService
   ) {}
 
   async validateUser(email: string, password: string) {
@@ -37,6 +40,40 @@ export class AuthService {
         email: user.email,
         name: user.name,
       },
+    };
+  }
+
+  /**
+   * Sesión anónima para modo CHAT_AUTH_MODE = "none"
+   * - sub = "anon:<uuid>"
+   * - exp = 15 minutos
+   */
+  async createAnonymousSession(params?: {
+    appId?: string;
+    channel?: string;
+  }): Promise<{ accessToken: string; expiresIn: number }> {
+    const anonId = `anon:${randomUUID()}`;
+
+    const appIdFromEnv = this.config.get<string>("APP_ID") ?? "default-app";
+
+    const payload: any = {
+      sub: anonId,
+      chatMode: "none",
+      appId: params?.appId || appIdFromEnv,
+      channel: params?.channel || "web_widget",
+      role: "anonymous",
+    };
+
+    // 15 minutos (900 segundos)
+    const expiresInSeconds = 15 * 60;
+
+    const accessToken = this.jwtService.sign(payload, {
+      expiresIn: expiresInSeconds, // también se puede "15m"
+    });
+
+    return {
+      accessToken,
+      expiresIn: expiresInSeconds,
     };
   }
 }

@@ -23,12 +23,36 @@ export class ChatAuthGuard implements CanActivate {
       (this.configService.get<string>("CHAT_AUTH_MODE") as ChatAuthMode) ??
       ChatAuthMode.NONE;
 
-    // 1) MODO SIN AUTH → no exigimos token
+    const req = context.switchToHttp().getRequest();
+    const authHeader: string | undefined =
+      req.headers["authorization"] || req.headers["Authorization"];
+
+    // 1) MODO SIN AUTH (CHAT_AUTH_MODE=none)
+    //
+    // - Si NO hay token → permitimos siempre (chat público), req.user = null
+    // - Si HAY token → lo validamos con AuthGuard("jwt")
+    //      - Si el token es inválido o caducado → 401
     if (mode === ChatAuthMode.NONE) {
-      return true;
+      if (!authHeader) {
+        // Chat totalmente público sin identificación
+        req.user = null;
+        return true;
+      }
+
+      // Hay Authorization: Bearer ... → validamos el JWT
+      try {
+        const result = await this.jwtAuthGuard.canActivate(context);
+        // AuthGuard("jwt") ya habrá rellenado req.user si es válido
+        return result as boolean;
+      } catch (err) {
+        // Aquí capturamos errores de verificación (incluida expiración)
+        throw new UnauthorizedException(
+          "Token anónimo inválido o caducado para el chat"
+        );
+      }
     }
 
-    // 2) MODO LOCAL / OAUTH2 → exigimos JWT
+    // 2) MODO LOCAL / OAUTH2 → exigimos JWT siempre
     try {
       const result = await this.jwtAuthGuard.canActivate(context);
       return result as boolean;
