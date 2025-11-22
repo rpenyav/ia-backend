@@ -183,15 +183,31 @@ export class LlmOrchestratorService {
         break;
     }
 
-    // Al terminar el streaming registramos el uso (tokens a 0 por ahora)
+    // ===== Estimación sencilla de tokens por longitud de texto =====
+    const inputChars = params.messages
+      .map((m) => m.content.length)
+      .reduce((acc, len) => acc + len, 0);
+
+    const outputChars = fullText.length;
+
+    const estimateTokens = (chars: number): number => {
+      if (chars <= 0) return 0;
+      return Math.max(1, Math.round(chars / 4)); // aprox: 4 chars ~ 1 token
+    };
+
+    const inputTokens = estimateTokens(inputChars);
+    const outputTokens = estimateTokens(outputChars);
+    const totalTokens = inputTokens + outputTokens;
+
+    // Registro de uso con estimación
     await this.usageService.logUsage({
       provider,
       model,
       userId: params.userId ?? null,
       conversationId: params.conversationId ?? null,
-      inputTokens: null,
-      outputTokens: null,
-      totalTokens: null,
+      inputTokens,
+      outputTokens,
+      totalTokens,
     });
   }
 
