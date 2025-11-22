@@ -164,4 +164,65 @@ export class UsageService {
       });
     }
   }
+
+  async findPaginated(
+    page: number,
+    limit: number
+  ): Promise<{
+    items: any[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    const safePage = page < 1 ? 1 : page;
+    const skip = (safePage - 1) * limit;
+
+    if (this.useMongo) {
+      if (!this.usageModel) {
+        throw new Error("UsageModel no disponible (Mongo)");
+      }
+
+      const [items, total] = await Promise.all([
+        this.usageModel
+          .find()
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(limit)
+          .lean()
+          .exec(),
+        this.usageModel.countDocuments().exec(),
+      ]);
+
+      const totalPages = total === 0 ? 1 : Math.ceil(total / limit);
+
+      return {
+        items,
+        total,
+        page: safePage,
+        limit,
+        totalPages,
+      };
+    } else {
+      if (!this.usageRepo) {
+        throw new Error("UsageRepository no disponible (SQL)");
+      }
+
+      const [items, total] = await this.usageRepo.findAndCount({
+        order: { createdAt: "DESC" },
+        skip,
+        take: limit,
+      });
+
+      const totalPages = total === 0 ? 1 : Math.ceil(total / limit);
+
+      return {
+        items,
+        total,
+        page: safePage,
+        limit,
+        totalPages,
+      };
+    }
+  }
 }

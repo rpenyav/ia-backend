@@ -1,16 +1,12 @@
+// src/main.ts
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
 import { ValidationPipe } from "@nestjs/common";
+import { NestExpressApplication } from "@nestjs/platform-express";
+import { join } from "path";
 
 async function bootstrap() {
-  console.log("DEBUG ENV:", {
-    NODE_ENV: process.env.NODE_ENV,
-    JWT_SECRET: process.env.JWT_SECRET,
-    AUTH_STRATEGY: process.env.AUTH_STRATEGY,
-    ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS,
-  });
-
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   // CORS
   const allowedOrigins = (process.env.ALLOWED_ORIGINS || "")
@@ -22,7 +18,18 @@ async function bootstrap() {
     origin: allowedOrigins.length > 0 ? allowedOrigins : true,
     methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
     allowedHeaders: "Content-Type, Authorization, x-api-key",
-    credentials: true, // 👈 entonces sí
+    credentials: true,
+  });
+
+  // 👇 Vistas: src/views desde la raíz del proyecto
+  const viewsPath = join(process.cwd(), "src", "views");
+  console.log("Views dir:", viewsPath);
+
+  app.setBaseViewsDir(viewsPath);
+  app.setViewEngine("hbs");
+
+  app.useStaticAssets(join(process.cwd(), "public"), {
+    prefix: "/static/", // URL base de los estáticos
   });
 
   // Validación global
@@ -36,7 +43,6 @@ async function bootstrap() {
 
   const port = process.env.PORT || 3000;
   await app.listen(port);
-
   console.log(`🚀 App listening on port ${port}`);
 }
 bootstrap();

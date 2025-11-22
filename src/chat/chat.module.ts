@@ -7,14 +7,24 @@ import { LlmModule } from "../llm/llm.module";
 import { PromptService } from "../prompts/prompt.service";
 import { SettingsModule } from "../settings/settings.module";
 
+import { PdfIngestionService } from "../doc-ingestion/pdf-ingestion.service";
+import { DocxIngestionService } from "../doc-ingestion/docx-ingestion.service";
+import { CsvIngestionService } from "../doc-ingestion/csv-ingestion.service";
+
 @Module({
   imports: [
     ConversationsModule,
     LlmModule,
-    SettingsModule.register(), // 👈 aquí traemos SettingsService al contexto
+    SettingsModule.register(), // SettingsService para PromptService
   ],
   controllers: [ChatController],
-  providers: [ChatService, PromptService],
+  providers: [
+    ChatService,
+    PromptService,
+    PdfIngestionService,
+    DocxIngestionService,
+    CsvIngestionService,
+  ],
   exports: [ChatService],
 })
 export class ChatModule {}

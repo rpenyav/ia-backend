@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>{{title}}</title>
+  <link rel="stylesheet" href="/static/backoffice.css" />
+</head>
+<body>
+  <div class="layout">
+    <header>
+      <div>
+        <h1>{{title}}</h1>
+        <p>Gestión de settings</p>
+      </div>
+      <nav>
+        <a href="/backoffice">📊 Dashboard</a>
+        <a href="/backoffice/users">👤 Usuarios</a>
+        <a href="/backoffice/settings">⚙️ Settings</a>
+      </nav>
+    </header>
+
+    <section class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h2>Listado de settings</h2>
+        <a href="/backoffice/settings/create" class="btn-primary" style="text-decoration:none; display:inline-block;">
+          ➕ Crear setting
+        </a>
+      </div>
+
+      {{!-- Buscador --}}
+      <form method="GET" action="/backoffice/settings" class="filters">
+        <div class="row">
+          <div class="field">
+            <label>Buscar por key o scope</label>
+            <input type="text" name="q" value="{{q}}" placeholder="ej: system_prompt" />
+          </div>
+          <div class="field">
+            <button type="submit" class="btn-primary">Buscar</button>
+            <a href="/backoffice/settings" class="btn-link">Limpiar</a>
+          </div>
+        </div>
+      </form>
+
+      {{#if settingsList.length}}
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Key</th>
+              <th>Scope</th>
+              <th>Value</th>
+              <th>Creado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{#each settingsList}}
+              <tr>
+                <td>{{this.id}}</td>
+                <td>{{this.key}}</td>
+                <td>{{this.scope}}</td>
+                <td>
+                  <pre style="max-width: 400px; max-height: 150px; overflow:auto; white-space: pre-wrap;">
+{{this.valueJson}}
+                  </pre>
+                </td>
+                <td>{{this.createdAt}}</td>
+                <td>
+                  <a href="/backoffice/settings/{{this.id}}/edit">✏️ Editar</a>
+                  <form method="POST"
+                        action="/backoffice/settings/{{this.id}}/delete"
+                        style="display:inline"
+                        onsubmit="return confirm('¿Seguro que quieres borrar este setting?');">
+                    <button type="submit" class="btn-link" style="color:#b91c1c;">🗑 Borrar</button>
+                  </form>
+                </td>
+              </tr>
+            {{/each}}
+          </tbody>
+        </table>
+
+        <div class="pagination">
+          {{#if hasPrev}}
+            <a href="/backoffice/settings?page={{prevPage}}&q={{q}}">⬅️ Anterior</a>
+          {{/if}}
+
+          <span>Página {{page}} de {{totalPages}} ({{total}} settings)</span>
+
+          {{#if hasNext}}
+            <a href="/backoffice/settings?page={{nextPage}}&q={{q}}">Siguiente ➡️</a>
+          {{/if}}
+        </div>
+      {{else}}
+        <p class="muted">No hay settings (o no coinciden con la búsqueda).</p>
+      {{/if}}
+    </section>
+  </div>
+</body>
+</html>

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>{{title}}</title>
+
+   <link rel="stylesheet" href="/static/backoffice.css" />
+</head>
+<body>
+  <div class="layout">
+    <header>
+      <div>
+        <h1>{{title}}</h1>
+        <p>{{message}}</p>
+      </div>
+      <nav>
+        <a href="/backoffice/users">👤 Gestión de usuarios</a>
+        <a href="/backoffice/settings">⚙️ Settings</a>
+      </nav>
+    </header>
+
+    <section class="card">
+      <h2>Uso reciente</h2>
+
+      {{!-- Filtros --}}
+      <form method="GET" action="/backoffice" class="filters">
+        <div class="row">
+          <div class="field">
+            <label>Fecha desde</label>
+            <input type="date" name="dateFrom" value="{{filters.dateFrom}}" />
+          </div>
+
+          <div class="field">
+            <label>Fecha hasta</label>
+            <input type="date" name="dateTo" value="{{filters.dateTo}}" />
+          </div>
+
+          <div class="field">
+            <label>User ID</label>
+            <input type="text" name="userId" value="{{filters.userId}}" placeholder="UUID del usuario" />
+          </div>
+
+          <div class="field">
+            <label>Proveedor</label>
+            <input type="text" name="provider" value="{{filters.provider}}" placeholder="ej: openai" />
+          </div>
+
+          <div class="field">
+            <label>Modelo</label>
+            <input type="text" name="model" value="{{filters.model}}" placeholder="ej: gpt-4.1" />
+          </div>
+
+          <div class="field">
+            <button type="submit" class="btn-primary">Filtrar</button>
+            <a href="/backoffice" class="btn-link">Limpiar filtros</a>
+          </div>
+        </div>
+      </form>
+
+      {{#if usages.length}}
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Usuario</th>
+              <th>Proveedor</th>
+              <th>Modelo</th>
+              <th>Conversation ID</th>
+              <th>Input tokens</th>
+              <th>Output tokens</th>
+              <th>Total tokens</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{#each usages}}
+              <tr>
+                <td>{{this.createdAt}}</td>
+                <td>{{this.userName}}</td>
+                <td>{{this.provider}}</td>
+                <td>{{this.model}}</td>
+                <td>{{this.conversationId}}</td>
+                <td>{{this.inputTokens}}</td>
+                <td>{{this.outputTokens}}</td>
+                <td>{{this.totalTokens}}</td>
+              </tr>
+            {{/each}}
+          </tbody>
+        </table>
+
+        <div class="pagination">
+          {{#if hasPrev}}
+            <a href="/backoffice?page={{prevPage}}
+              {{#if filters.userId}}&userId={{filters.userId}}{{/if}}
+              {{#if filters.provider}}&provider={{filters.provider}}{{/if}}
+              {{#if filters.model}}&model={{filters.model}}{{/if}}
+              {{#if filters.dateFrom}}&dateFrom={{filters.dateFrom}}{{/if}}
+              {{#if filters.dateTo}}&dateTo={{filters.dateTo}}{{/if}}
+            ">⬅️ Anterior</a>
+          {{/if}}
+
+          <span>Página {{page}} de {{totalPages}} ({{total}} registros filtrados)</span>
+
+          {{#if hasNext}}
+            <a href="/backoffice?page={{nextPage}}
+              {{#if filters.userId}}&userId={{filters.userId}}{{/if}}
+              {{#if filters.provider}}&provider={{filters.provider}}{{/if}}
+              {{#if filters.model}}&model={{filters.model}}{{/if}}
+              {{#if filters.dateFrom}}&dateFrom={{filters.dateFrom}}{{/if}}
+              {{#if filters.dateTo}}&dateTo={{filters.dateTo}}{{/if}}
+            ">Siguiente ➡️</a>
+          {{/if}}
+        </div>
+      {{else}}
+        <p class="muted">No hay registros de uso (con los filtros actuales).</p>
+      {{/if}}
+    </section>
+  </div>
+</body>
+</html>

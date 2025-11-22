@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>{{title}}</title>
+  <link rel="stylesheet" href="/static/backoffice.css" />
+</head>
+<body>
+  <div class="layout">
+    <header>
+      <div>
+        <h1>{{title}}</h1>
+        <p>Gestión de settings</p>
+      </div>
+      <nav>
+        <a href="/backoffice">📊 Dashboard</a>
+        <a href="/backoffice/users">👤 Usuarios</a>
+        <a href="/backoffice/settings">⚙️ Settings</a>
+      </nav>
+    </header>
+
+    <section class="card">
+      <h2>Crear setting</h2>
+
+      <form method="POST" action="/backoffice/settings/create" class="filters">
+        <div class="row">
+          <div class="field">
+            <label>Key</label>
+            <input type="text" name="key" required placeholder="ej: system_prompt" />
+          </div>
+
+          <div class="field">
+            <label>Scope (opcional)</label>
+            <input type="text" name="scope" placeholder="ej: global o id de cliente" />
+          </div>
+        </div>
+
+        <div class="field" style="margin-top: 12px;">
+          <label>Value (JSON)</label>
+          <textarea name="valueJson" rows="10" cols="60" style="font-family:monospace; font-size:12px; padding:8px; border-radius:6px; border:1px solid #d1d5db;" placeholder='ej: { "lang": "es" }'></textarea>
+        </div>
+
+        <div class="field" style="margin-top: 12px;">
+          <button type="submit" class="btn-primary">Crear</button>
+          <a href="/backoffice/settings" class="btn-link">Cancelar</a>
+        </div>
+      </form>
+    </section>
+  </div>
+</body>
+</html>

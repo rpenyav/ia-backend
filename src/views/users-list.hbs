@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>{{title}}</title>
+  <link rel="stylesheet" href="/static/backoffice.css" />
+</head>
+<body>
+  <div class="layout">
+    <header>
+      <div>
+        <h1>{{title}}</h1>
+        <p>Gestión de usuarios</p>
+      </div>
+      <nav>
+        <a href="/backoffice">📊 Dashboard</a>
+        <a href="/backoffice/users">👤 Usuarios</a>
+        <a href="/backoffice/settings">⚙️ Settings</a>
+      </nav>
+    </header>
+
+    <section class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h2>Listado de usuarios</h2>
+        <a href="/backoffice/users/create" class="btn-primary" style="text-decoration:none; display:inline-block;">
+          ➕ Crear usuario
+        </a>
+      </div>
+
+      {{!-- Buscador --}}
+      <form method="GET" action="/backoffice/users" class="filters">
+        <div class="row">
+          <div class="field">
+            <label>Buscar por nombre o email</label>
+            <input type="text" name="q" value="{{q}}" placeholder="ej: persona@empresa.com" />
+          </div>
+          <div class="field">
+            <button type="submit" class="btn-primary">Buscar</button>
+            <a href="/backoffice/users" class="btn-link">Limpiar</a>
+          </div>
+        </div>
+      </form>
+
+      {{#if users.length}}
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Nombre</th>
+              <th>Email</th>
+              <th>Creado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{#each users}}
+              <tr>
+                <td>{{this.id}}</td>
+                <td>{{this.name}}</td>
+                <td>{{this.email}}</td>
+                <td>{{this.createdAt}}</td>
+                <td>
+                  <a href="/backoffice/users/{{this.id}}/edit">✏️ Editar</a>
+                  <form method="POST"
+                        action="/backoffice/users/{{this.id}}/delete"
+                        style="display:inline"
+                        onsubmit="return confirm('¿Seguro que quieres borrar este usuario?');">
+                    <button type="submit" class="btn-link" style="color:#b91c1c;">🗑 Borrar</button>
+                  </form>
+                </td>
+              </tr>
+            {{/each}}
+          </tbody>
+        </table>
+
+        <div class="pagination">
+          {{#if hasPrev}}
+            <a href="/backoffice/users?page={{prevPage}}&q={{q}}">⬅️ Anterior</a>
+          {{/if}}
+
+          <span>Página {{page}} de {{totalPages}} ({{total}} usuarios)</span>
+
+          {{#if hasNext}}
+            <a href="/backoffice/users?page={{nextPage}}&q={{q}}">Siguiente ➡️</a>
+          {{/if}}
+        </div>
+      {{else}}
+        <p class="muted">No hay usuarios (o no coinciden con la búsqueda).</p>
+      {{/if}}
+    </section>
+  </div>
+</body>
+</html>

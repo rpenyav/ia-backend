@@ -1,3 +1,4 @@
+// src/llm/llm-orchestrator.service.ts
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import OpenAI from "openai";
@@ -15,7 +16,7 @@ type LlmProvider = "openai" | "gemini" | "deepseek" | "grok";
 export class LlmOrchestratorService {
   private openai: OpenAI | null;
   private deepseek: OpenAI | null;
-  private grok: OpenAI | null; // usamos el SDK OpenAI contra la API de xAI
+  private grok: OpenAI | null; // usamos el SDK OpenAI contra la API de xAI / DeepSeek
 
   constructor(
     private readonly config: ConfigService,
@@ -65,6 +66,12 @@ export class LlmOrchestratorService {
     return p;
   }
 
+  private estimateTokensFromText(text: string): number {
+    if (!text) return 0;
+    // regla de dedo: ~4 caracteres por token
+    return Math.ceil(text.length / 4);
+  }
+
   /**
    * Punto de entrada único: delega según DEFAULT_LLM_PROVIDER
    * y registra uso al final.
@@ -76,6 +83,7 @@ export class LlmOrchestratorService {
     maxTokens?: number;
     userId?: string | null;
     conversationId?: string | null;
+    imageUrls?: string[]; // 👈 NUEVO (opcional) para visión OpenAI
   }): AsyncGenerator<string> {
     const provider = this.getProvider();
 
@@ -123,17 +131,18 @@ export class LlmOrchestratorService {
         model =
           params.model ||
           this.config.get<string>("DEFAULT_LLM_MODEL") ||
-          "gpt-4.1-mini";
+          "gpt-4o-mini";
         temperature = params.temperature ?? defaultTemp;
         maxTokens = params.maxTokens ?? defaultMaxTokens;
         break;
     }
 
     let fullText = "";
+    let inputTokens: number | null = null;
+    let outputTokens: number | null = null;
 
-    // Delegamos en el provider, pero ya con modelo/temps resueltos
     switch (provider) {
-      case "gemini":
+      case "gemini": {
         for await (const delta of this.streamChatGemini({
           model,
           messages: params.messages,
@@ -143,9 +152,15 @@ export class LlmOrchestratorService {
           fullText += delta;
           yield delta;
         }
-        break;
 
-      case "deepseek":
+        // estimación de tokens para gemini
+        const inputText = params.messages.map((m) => m.content).join("\n");
+        inputTokens = this.estimateTokensFromText(inputText);
+        outputTokens = this.estimateTokensFromText(fullText);
+        break;
+      }
+
+      case "deepseek": {
         for await (const delta of this.streamChatDeepSeek({
           model,
           messages: params.messages,
@@ -155,9 +170,14 @@ export class LlmOrchestratorService {
           fullText += delta;
           yield delta;
         }
-        break;
 
-      case "grok":
+        const inputText = params.messages.map((m) => m.content).join("\n");
+        inputTokens = this.estimateTokensFromText(inputText);
+        outputTokens = this.estimateTokensFromText(fullText);
+        break;
+      }
+
+      case "grok": {
         for await (const delta of this.streamChatGrok({
           model,
           messages: params.messages,
@@ -167,39 +187,49 @@ export class LlmOrchestratorService {
           fullText += delta;
           yield delta;
         }
+
+        const inputText = params.messages.map((m) => m.content).join("\n");
+        inputTokens = this.estimateTokensFromText(inputText);
+        outputTokens = this.estimateTokensFromText(fullText);
         break;
+      }
 
       case "openai":
-      default:
+      default: {
+        // para OpenAI usamos usage real a través del stream
+        const usageRef = {
+          inputTokens: null as number | null,
+          outputTokens: null as number | null,
+        };
+
         for await (const delta of this.streamChatOpenAI({
           model,
           messages: params.messages,
           temperature,
           maxTokens,
+          imageUrls: params.imageUrls,
+          usageRef,
         })) {
           fullText += delta;
           yield delta;
         }
+
+        inputTokens = usageRef.inputTokens;
+        outputTokens = usageRef.outputTokens;
+
+        // si por lo que sea no trajera usage, caemos a estimación
+        if (inputTokens == null) {
+          const inputText = params.messages.map((m) => m.content).join("\n");
+          inputTokens = this.estimateTokensFromText(inputText);
+        }
+        if (outputTokens == null) {
+          outputTokens = this.estimateTokensFromText(fullText);
+        }
+
         break;
+      }
     }
 
-    // ===== Estimación sencilla de tokens por longitud de texto =====
-    const inputChars = params.messages
-      .map((m) => m.content.length)
-      .reduce((acc, len) => acc + len, 0);
-
-    const outputChars = fullText.length;
-
-    const estimateTokens = (chars: number): number => {
-      if (chars <= 0) return 0;
-      return Math.max(1, Math.round(chars / 4)); // aprox: 4 chars ~ 1 token
-    };
-
-    const inputTokens = estimateTokens(inputChars);
-    const outputTokens = estimateTokens(outputChars);
-    const totalTokens = inputTokens + outputTokens;
-
-    // Registro de uso con estimación
     await this.usageService.logUsage({
       provider,
       model,
@@ -207,12 +237,12 @@ export class LlmOrchestratorService {
       conversationId: params.conversationId ?? null,
       inputTokens,
       outputTokens,
-      totalTokens,
+      totalTokens: null, // se calcula en UsageService si es null
     });
   }
 
   // =========================================================
-  // OPENAI
+  // OPENAI con visión (image_url)
   // =========================================================
 
   private async *streamChatOpenAI(params: {
@@ -220,29 +250,91 @@ export class LlmOrchestratorService {
     messages: LlmMessage[];
     temperature: number;
     maxTokens: number;
+    imageUrls?: string[];
+    usageRef: { inputTokens: number | null; outputTokens: number | null };
   }): AsyncGenerator<string> {
     if (!this.openai) {
       throw new Error("OPENAI_API_KEY no está configurado");
     }
 
+    const { model, messages, temperature, maxTokens, imageUrls, usageRef } =
+      params;
+
+    const hasImages = imageUrls && imageUrls.length > 0;
+
+    let openaiMessages: any[] = messages;
+
+    if (hasImages) {
+      // añadimos las image_url al ÚLTIMO mensaje de usuario
+      let lastUserIndex = -1;
+      for (let i = messages.length - 1; i >= 0; i--) {
+        if (messages[i].role === "user") {
+          lastUserIndex = i;
+          break;
+        }
+      }
+
+      if (lastUserIndex >= 0) {
+        openaiMessages = messages.map((m, idx) => {
+          if (idx !== lastUserIndex || m.role !== "user") {
+            return m;
+          }
+
+          const contentParts: any[] = [
+            { type: "text", text: m.content },
+            ...(imageUrls || []).map((url) => ({
+              type: "image_url",
+              image_url: { url },
+            })),
+          ];
+
+          return {
+            role: "user",
+            content: contentParts,
+          };
+        });
+      }
+    }
+
     const stream = await this.openai.chat.completions.create({
-      model: params.model,
-      messages: params.messages,
-      temperature: params.temperature,
-      max_tokens: params.maxTokens,
+      model,
+      messages: openaiMessages as any, // mezclamos string & parts (para visión)
+      temperature,
+      max_tokens: maxTokens,
       stream: true,
+      stream_options: { include_usage: true },
     });
 
     for await (const chunk of stream) {
-      const delta = chunk.choices[0]?.delta?.content;
-      if (delta) {
-        yield delta;
+      const deltaContent: any = chunk.choices[0]?.delta?.content;
+
+      // modo texto normal (string)
+      if (typeof deltaContent === "string") {
+        if (deltaContent) {
+          yield deltaContent;
+        }
+      }
+      // modo multimodal: array de partes [{type:"text", text:"..."}, ...]
+      else if (Array.isArray(deltaContent)) {
+        for (const part of deltaContent) {
+          if (part.type === "text" && part.text) {
+            yield part.text;
+          }
+        }
+      }
+
+      const usage = (chunk as any).usage;
+      if (usage) {
+        usageRef.inputTokens =
+          usage.prompt_tokens ?? usageRef.inputTokens ?? null;
+        usageRef.outputTokens =
+          usage.completion_tokens ?? usageRef.outputTokens ?? null;
       }
     }
   }
 
   // =========================================================
-  // DEEPSEEK
+  // DEEPSEEK (formato OpenAI /chat/completions)
   // =========================================================
 
   private async *streamChatDeepSeek(params: {
@@ -272,7 +364,7 @@ export class LlmOrchestratorService {
   }
 
   // =========================================================
-  // GROK / xAI
+  // GROK / xAI (formato OpenAI /chat/completions)
   // =========================================================
 
   private async *streamChatGrok(params: {
@@ -302,7 +394,7 @@ export class LlmOrchestratorService {
   }
 
   // =========================================================
-  // GEMINI
+  // GEMINI (REST, streamGenerateContent)
   // =========================================================
 
   private async *streamChatGemini(params: {

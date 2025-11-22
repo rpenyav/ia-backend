@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>{{title}}</title>
+  <link rel="stylesheet" href="/static/backoffice.css" />
+</head>
+<body>
+  <div class="layout">
+    <header>
+      <div>
+        <h1>{{title}}</h1>
+        <p>Gestión de usuarios</p>
+      </div>
+      <nav>
+        <a href="/backoffice">📊 Dashboard</a>
+        <a href="/backoffice/users">👤 Usuarios</a>
+        <a href="/backoffice/settings">⚙️ Settings</a>
+      </nav>
+    </header>
+
+    <section class="card">
+      {{#if user}}
+        <h2>Editar usuario: {{user.email}}</h2>
+
+        <form method="POST" action="/backoffice/users/{{user.id}}/edit" class="filters">
+          <div class="row">
+            <div class="field">
+              <label>Nombre</label>
+              <input type="text" name="name" value="{{user.name}}" />
+            </div>
+
+            <div class="field">
+              <label>Email (no editable)</label>
+              <input type="email" value="{{user.email}}" disabled />
+            </div>
+
+            <div class="field">
+              <label>Nueva contraseña (opcional)</label>
+              <input type="password" name="password" />
+            </div>
+
+            <div class="field">
+              <button type="submit" class="btn-primary">Guardar cambios</button>
+              <a href="/backoffice/users" class="btn-link">Cancelar</a>
+            </div>
+          </div>
+        </form>
+      {{else}}
+        <p class="muted">Usuario no encontrado.</p>
+        <a href="/backoffice/users" class="btn-link">Volver al listado</a>
+      {{/if}}
+    </section>
+  </div>
+</body>
+</html>

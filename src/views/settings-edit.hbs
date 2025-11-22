@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>{{title}}</title>
+  <link rel="stylesheet" href="/static/backoffice.css" />
+</head>
+<body>
+  <div class="layout">
+    <header>
+      <div>
+        <h1>{{title}}</h1>
+        <p>Gestión de settings</p>
+      </div>
+      <nav>
+        <a href="/backoffice">📊 Dashboard</a>
+        <a href="/backoffice/users">👤 Usuarios</a>
+        <a href="/backoffice/settings">⚙️ Settings</a>
+      </nav>
+    </header>
+
+    <section class="card">
+      {{#if setting}}
+        <h2>Editar setting: {{setting.key}}</h2>
+
+        <form method="POST" action="/backoffice/settings/{{setting.id}}/edit" class="filters">
+          <div class="row">
+            <div class="field">
+              <label>Key</label>
+              <input type="text" name="key" value="{{setting.key}}" required />
+            </div>
+
+            <div class="field">
+              <label>Scope</label>
+              <input type="text" name="scope" value="{{setting.scope}}" />
+            </div>
+          </div>
+
+          <div class="field" style="margin-top: 12px;">
+            <label>Value (JSON)</label>
+            <textarea name="valueJson" rows="10" cols="60" style="font-family:monospace; font-size:12px; padding:8px; border-radius:6px; border:1px solid #d1d5db;">{{valueJson}}</textarea>
+          </div>
+
+          <div class="field" style="margin-top: 12px;">
+            <button type="submit" class="btn-primary">Guardar cambios</button>
+            <a href="/backoffice/settings" class="btn-link">Cancelar</a>
+          </div>
+        </form>
+      {{else}}
+        <p class="muted">Setting no encontrado.</p>
+        <a href="/backoffice/settings" class="btn-link">Volver al listado</a>
+      {{/if}}
+    </section>
+  </div>
+</body>
+</html>

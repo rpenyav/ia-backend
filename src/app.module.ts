@@ -10,6 +10,7 @@ import { ChatModule } from "./chat/chat.module";
 import { SettingsModule } from "./settings/settings.module";
 import { ConversationsModule } from "./conversations/conversations.module";
 import { StorageModule } from "./storage/storage.module";
+import { BackofficeModule } from "./backoffice/backoffice.module";
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { StorageModule } from "./storage/storage.module";
     ChatModule,
     UsageModule,
     ConversationsModule,
+    BackofficeModule,
     StorageModule,
   ],
 })

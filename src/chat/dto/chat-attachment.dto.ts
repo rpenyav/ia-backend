@@ -1,24 +1,20 @@
 // src/chat/dto/chat-attachment.dto.ts
-import {
-  IsIn,
-  IsOptional,
-  IsString,
-  IsNumber,
-  IsObject,
-} from "class-validator";
+import { IsString, IsOptional, IsNumber, IsEnum, IsUrl } from "class-validator";
+
+export enum ChatAttachmentType {
+  FILE = "file",
+  IMAGE = "image",
+  LINK = "link",
+  OTHER = "other",
+}
 
 export class ChatAttachmentDto {
-  @IsOptional()
-  @IsIn(["file", "image", "link", "other"])
-  type?: "file" | "image" | "link" | "other";
+  @IsOptional() // si quieres que sea obligatorio, quita @IsOptional()
+  @IsEnum(ChatAttachmentType)
+  type?: ChatAttachmentType;
 
-  @IsString()
+  @IsUrl()
   url: string;
-
-  // 👇 nuevo: permitimos la key (por ejemplo Cloudinary public_id)
-  @IsOptional()
-  @IsString()
-  key?: string;
 
   @IsOptional()
   @IsString()
@@ -32,7 +28,15 @@ export class ChatAttachmentDto {
   @IsNumber()
   sizeBytes?: number;
 
+  // 👇 campos que te está devolviendo el upload
   @IsOptional()
-  @IsObject()
+  @IsString()
+  provider?: string;
+
+  @IsOptional()
+  @IsString()
+  key?: string;
+
+  @IsOptional()
   extra?: Record<string, any>;
 }

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>{{title}}</title>
+  <link rel="stylesheet" href="/static/backoffice.css" />
+</head>
+<body>
+  <div class="layout">
+    <header>
+      <div>
+        <h1>{{title}}</h1>
+        <p>Gestión de usuarios</p>
+      </div>
+      <nav>
+        <a href="/backoffice">📊 Dashboard</a>
+        <a href="/backoffice/users">👤 Usuarios</a>
+        <a href="/backoffice/settings">⚙️ Settings</a>
+      </nav>
+    </header>
+
+    <section class="card">
+      <h2>Crear usuario</h2>
+
+      <form method="POST" action="/backoffice/users/create" class="filters">
+        <div class="row">
+          <div class="field">
+            <label>Nombre</label>
+            <input type="text" name="name" required />
+          </div>
+          <div class="field">
+            <label>Email</label>
+            <input type="email" name="email" required />
+          </div>
+          <div class="field">
+            <label>Contraseña</label>
+            <input type="password" name="password" required />
+          </div>
+          <div class="field">
+            <button type="submit" class="btn-primary">Crear</button>
+            <a href="/backoffice/users" class="btn-link">Cancelar</a>
+          </div>
+        </div>
+      </form>
+    </section>
+  </div>
+</body>
+</html>
