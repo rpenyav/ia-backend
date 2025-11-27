@@ -15,13 +15,18 @@ async function bootstrap() {
     .map((o) => o.trim())
     .filter((o) => o.length > 0);
 
+  // app.enableCors({
+  //   origin: allowedOrigins.length > 0 ? allowedOrigins : true,
+  //   methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
+  //   allowedHeaders: "Content-Type, Authorization, x-api-key",
+  //   credentials: true,
+  // });
   app.enableCors({
-    origin: allowedOrigins.length > 0 ? allowedOrigins : true,
+    origin: true, // 👈 permite cualquier origen, devuelve el mismo Origin que llega
     methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
     allowedHeaders: "Content-Type, Authorization, x-api-key",
     credentials: true,
   });
-
   // 👇 Vistas: src/views desde la raíz del proyecto
   const viewsPath = join(process.cwd(), "src", "views");
   console.log("Views dir:", viewsPath);
