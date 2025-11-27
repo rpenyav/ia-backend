@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>{{title}}</title>
+  <link rel="stylesheet" href="/static/backoffice.css" />
+</head>
+<body>
+  <div class="layout">
+    <header>
+      <div>
+        <h1>{{title}}</h1>
+        <p>Gestión de variables de entorno en BBDD</p>
+      </div>
+      <nav>
+        <a href="/backoffice">📊 Dashboard</a>
+        <a href="/backoffice/users">👤 Usuarios</a>
+        <a href="/backoffice/settings">⚙️ Settings</a>
+        <a href="/backoffice/env">🌐 Env vars</a>
+      </nav>
+    </header>
+
+    <section class="card">
+      <h2>Variables configurables</h2>
+
+      {{#if envVars.length}}
+        <table>
+          <thead>
+            <tr>
+              <th>Key</th>
+              <th>Descripción</th>
+              <th>Valor</th>
+              <th>Secreta</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{#each envVars}}
+              <tr>
+                <td>{{this.key}}</td>
+                <td>
+                  <form method="POST" action="/backoffice/env/{{this.id}}/edit">
+                    <input type="hidden" name="value" value="{{this.value}}" />
+                    <input
+                      type="text"
+                      name="description"
+                      value="{{this.description}}"
+                      style="width: 220px;"
+                    />
+                </td>
+                <td>
+                    {{#if this.isSecret}}
+                      <input
+                        type="password"
+                        name="value"
+                        value="{{this.value}}"
+                        style="width: 260px;"
+                      />
+                    {{else}}
+                      <input
+                        type="text"
+                        name="value"
+                        value="{{this.value}}"
+                        style="width: 260px;"
+                      />
+                    {{/if}}
+                </td>
+                <td style="text-align:center;">
+                  <input
+                    type="checkbox"
+                    name="isSecret"
+                    {{#if this.isSecret}}checked{{/if}}
+                  />
+                </td>
+                <td>
+                    <button type="submit" class="btn-primary">Guardar</button>
+                  </form>
+                </td>
+              </tr>
+            {{/each}}
+          </tbody>
+        </table>
+      {{else}}
+        <p class="muted">No hay variables configuradas todavía.</p>
+      {{/if}}
+    </section>
+  </div>
+</body>
+</html>

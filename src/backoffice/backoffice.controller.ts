@@ -1,8 +1,10 @@
 // src/backoffice/backoffice.controller.ts
-import { Controller, Get, Query, Render } from "@nestjs/common";
+import { Controller, Get, Query, Render, UseGuards } from "@nestjs/common";
 import { UsageService } from "../usage/usage.service";
 import { UsersService } from "../users/users.service";
+import { BackofficeAuthGuard } from "./backoffice-auth.guard";
 
+@UseGuards(BackofficeAuthGuard)
 @Controller("backoffice")
 export class BackofficeController {
   constructor(

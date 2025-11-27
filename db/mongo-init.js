@@ -1,243 +1,254 @@
 // mongo-init.js
-// ------------------------------------------------------
-// Script de inicialización de MongoDB para el backend
-// Ejecutar con:
-//
-//   mongosh "mongodb://user:pass@host:27017/chatbot_db" mongo-init.js
-//   o con Atlas:
-//   mongosh "mongodb+srv://user:pass@cluster-url/chatbot_db" mongo-init.js
-//
-// ------------------------------------------------------
+// Script de inicialización de la BBDD chatbot_db (parte de env_vars)
 
-function ensureCollection(name, options = {}) {
-  const existing = db.getCollectionNames();
-  if (!existing.includes(name)) {
-    db.createCollection(name, options);
-    print(`✔ Collection '${name}' creada`);
-  } else {
-    print(`• Collection '${name}' ya existe, no se crea`);
-    if (options.validator) {
-      db.runCommand({
-        collMod: name,
-        validator: options.validator,
-        validationLevel: "moderate",
-      });
-      print(`  ↳ Validator actualizado para '${name}'`);
-    }
-  }
+db = db.getSiblingDB("chatbot_db");
+
+// Crear colección si no existe
+if (!db.getCollectionNames().includes("env_vars")) {
+  db.createCollection("env_vars");
 }
 
-// ======================= USERS =======================
+// Índice único por key
+db.env_vars.createIndex({ key: 1 }, { unique: true });
 
-const usersValidator = {
-  $jsonSchema: {
-    bsonType: "object",
-    required: ["email", "passwordHash", "createdAt"],
-    properties: {
-      _id: { bsonType: "objectId" },
-      email: {
-        bsonType: "string",
-        description: "Email del usuario, único",
-      },
-      passwordHash: {
-        bsonType: "string",
-        description: "Hash de la contraseña",
-      },
-      name: {
-        bsonType: ["string", "null"],
-        description: "Nombre opcional",
-      },
-      createdAt: {
-        bsonType: "date",
-      },
-      updatedAt: {
-        bsonType: ["date", "null"],
-      },
-    },
+// Variables que se gestionan desde backoffice
+const envVars = [
+  // AUTENTICACIÓN GLOBAL
+  {
+    key: "CHAT_AUTH_MODE",
+    value: "local",
+    description: "none | local | oauth2",
+    isSecret: false,
   },
-};
+  {
+    key: "AUTH_STRATEGY",
+    value: "none",
+    description: "none | api_key | oauth2",
+    isSecret: false,
+  },
+  {
+    key: "INTERNAL_API_KEY",
+    value: "CHANGE_ME_INTERNAL_API_KEY",
+    description: "API key interna para AUTH_STRATEGY=api_key",
+    isSecret: true,
+  },
 
-ensureCollection("users", { validator: usersValidator });
+  // AUTH USUARIOS (JWT)
+  {
+    key: "JWT_SECRET",
+    value: "CHANGE_ME_JWT_SECRET",
+    description: "JWT secret",
+    isSecret: true,
+  },
+  {
+    key: "JWT_EXPIRES_IN",
+    value: "1h",
+    description: "TTL del JWT (p.ej. 1h, 2d)",
+    isSecret: false,
+  },
 
-// índice único por email
-db.users.createIndex({ email: 1 }, { unique: true });
-print("✔ Índice único en users.email");
+  // IA – VALORES POR DEFECTO
+  {
+    key: "DEFAULT_LLM_PROVIDER",
+    value: "openai",
+    description:
+      "Proveedor LLM por defecto (openai | grok | gemini | deepseek)",
+    isSecret: false,
+  },
+  {
+    key: "DEFAULT_LLM_MODEL",
+    value: "gpt-4o-mini",
+    description: "Modelo LLM por defecto",
+    isSecret: false,
+  },
+  {
+    key: "DEFAULT_LLM_TEMPERATURE",
+    value: "0.2",
+    description: "Temperatura por defecto",
+    isSecret: false,
+  },
+  {
+    key: "DEFAULT_LLM_MAX_TOKENS",
+    value: "200",
+    description: "Tokens máximos por defecto",
+    isSecret: false,
+  },
 
-// Usuario seed
-const INITIAL_PASSWORD_HASH =
-  "$2b$10$aivTNH4R4oxgSgQoOlgBTepkf9x8eEEH0/ah8yBnCCFwaundY69Ne"; // 12345678
+  // IA – API KEYS (rellenar desde backoffice)
+  {
+    key: "OPENAI_API_KEY",
+    value: "CHANGE_ME_OPENAI",
+    description: "OpenAI API key",
+    isSecret: true,
+  },
+  {
+    key: "GEMINI_API_KEY",
+    value: "CHANGE_ME_GEMINI",
+    description: "Gemini API key",
+    isSecret: true,
+  },
+  {
+    key: "GROK_API_KEY",
+    value: "CHANGE_ME_GROK",
+    description: "Grok API key",
+    isSecret: true,
+  },
+  {
+    key: "DEEPSEEK_API_KEY",
+    value: "CHANGE_ME_DEEPSEEK",
+    description: "Deepseek API key",
+    isSecret: true,
+  },
 
-const existingSeedUser = db.users.findOne({ email: "test@test.com" });
+  // IA – BASE URLs
+  {
+    key: "OPENAI_BASE_URL",
+    value: "https://api.openai.com/v1",
+    description: "Base URL OpenAI",
+    isSecret: false,
+  },
+  {
+    key: "GEMINI_BASE_URL",
+    value: "https://generativelanguage.googleapis.com/v1beta",
+    description: "Base URL Gemini",
+    isSecret: false,
+  },
+  {
+    key: "GROK_BASE_URL",
+    value: "https://api.x.ai/v1",
+    description: "Base URL Grok",
+    isSecret: false,
+  },
+  {
+    key: "DEEPSEEK_BASE_URL",
+    value: "https://api.deepseek.com/v1",
+    description: "Base URL Deepseek",
+    isSecret: false,
+  },
 
-if (!existingSeedUser) {
-  db.users.insertOne({
-    email: "test@test.com",
-    passwordHash: INITIAL_PASSWORD_HASH,
-    name: "Usuario Test",
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  });
-  print("✔ Usuario seed 'test@test.com' creado (password: 12345678)");
-} else {
-  print("• Usuario seed 'test@test.com' ya existe, no se crea");
+  // PROXY CORPORATIVO
+  {
+    key: "HTTP_PROXY",
+    value: "",
+    description: "Proxy HTTP corporativo (opcional)",
+    isSecret: false,
+  },
+  {
+    key: "HTTPS_PROXY",
+    value: "",
+    description: "Proxy HTTPS corporativo (opcional)",
+    isSecret: false,
+  },
+
+  // LOGGING / OBSERVABILIDAD
+  {
+    key: "LOG_LEVEL",
+    value: "info",
+    description: "Nivel de logs (error | warn | info | debug)",
+    isSecret: false,
+  },
+  {
+    key: "HTTP_LOGGING_ENABLED",
+    value: "true",
+    description: "Logs HTTP habilitados",
+    isSecret: false,
+  },
+  {
+    key: "METRICS_ENABLED",
+    value: "false",
+    description: "Exponer métricas Prometheus",
+    isSecret: false,
+  },
+  {
+    key: "METRICS_PORT",
+    value: "9100",
+    description: "Puerto para métricas",
+    isSecret: false,
+  },
+
+  // STORAGE
+  {
+    key: "STORAGE_PROVIDER",
+    value: "cloudinary",
+    description: "cloudinary | s3 | local",
+    isSecret: false,
+  },
+  {
+    key: "CLOUDINARY_CLOUD_NAME",
+    value: "CHANGE_ME_CLOUD_NAME",
+    description: "Cloudinary cloud name",
+    isSecret: false,
+  },
+  {
+    key: "CLOUDINARY_API_KEY",
+    value: "CHANGE_ME_CLOUDINARY_API_KEY",
+    description: "Cloudinary API key",
+    isSecret: true,
+  },
+  {
+    key: "CLOUDINARY_API_SECRET",
+    value: "CHANGE_ME_CLOUDINARY_API_SECRET",
+    description: "Cloudinary API secret",
+    isSecret: true,
+  },
+  {
+    key: "S3_ENDPOINT",
+    value: "",
+    description: "Endpoint S3/MinIO (opcional)",
+    isSecret: false,
+  },
+  {
+    key: "S3_REGION",
+    value: "",
+    description: "Región S3",
+    isSecret: false,
+  },
+  {
+    key: "S3_BUCKET",
+    value: "",
+    description: "Bucket S3/MinIO",
+    isSecret: false,
+  },
+  {
+    key: "S3_ACCESS_KEY_ID",
+    value: "",
+    description: "Access key S3/MinIO",
+    isSecret: true,
+  },
+  {
+    key: "S3_SECRET_ACCESS_KEY",
+    value: "",
+    description: "Secret key S3/MinIO",
+    isSecret: true,
+  },
+];
+
+// Upsert: si no existe la key, la crea; si existe, NO pisa el value
+envVars.forEach((doc) => {
+  db.env_vars.updateOne(
+    { key: doc.key },
+    { $setOnInsert: doc },
+    { upsert: true }
+  );
+});
+
+// Super admin del backoffice
+if (!db.getCollectionNames().includes("backoffice_admins")) {
+  db.createCollection("backoffice_admins");
 }
 
-// =================== CONVERSATIONS ===================
+db.backoffice_admins.createIndex({ email: 1 }, { unique: true });
 
-const conversationsValidator = {
-  $jsonSchema: {
-    bsonType: "object",
-    required: ["userId", "createdAt"],
-    properties: {
-      _id: { bsonType: "objectId" },
-      userId: {
-        bsonType: "string",
-        description: "ID del usuario propietario (string/uuid)",
-      },
-      title: {
-        bsonType: ["string", "null"],
-      },
-      channel: {
-        bsonType: ["string", "null"], // ej: "widget-web", "backoffice"
-      },
-      metadata: {
-        bsonType: ["object", "null"],
-      },
-      createdAt: {
-        bsonType: "date",
-      },
-      updatedAt: {
-        bsonType: ["date", "null"],
-      },
+// OJO: cambia el hash por uno real de bcrypt
+db.backoffice_admins.updateOne(
+  { email: "admin@backoffice.local" },
+  {
+    $setOnInsert: {
+      email: "admin@backoffice.local",
+      passwordHash: "$2b$10$REEMPLAZA_ESTE_HASH_POR_EL_DE_TU_PASSWORD",
+      createdAt: new Date(),
+      updatedAt: new Date(),
     },
   },
-};
-
-ensureCollection("conversations", { validator: conversationsValidator });
-
-// índices útiles
-db.conversations.createIndex({ userId: 1, createdAt: -1 });
-print("✔ Índice en conversations (userId, createdAt)");
-
-// ======================= MESSAGES =======================
-
-const messagesValidator = {
-  $jsonSchema: {
-    bsonType: "object",
-    required: ["conversationId", "role", "content", "createdAt"],
-    properties: {
-      _id: { bsonType: "objectId" },
-      conversationId: {
-        bsonType: "string",
-        description: "ID de la conversación (string/uuid)",
-      },
-      role: {
-        bsonType: "string",
-        enum: ["user", "assistant", "system"],
-        description: "Rol del mensaje",
-      },
-      content: {
-        bsonType: "string",
-      },
-      attachments: {
-        bsonType: ["array", "null"],
-        items: {
-          bsonType: "object",
-        },
-        description: "Adjuntos serializados (files, links, etc.)",
-      },
-      metadata: {
-        bsonType: ["object", "null"],
-      },
-      createdAt: {
-        bsonType: "date",
-      },
-      updatedAt: {
-        bsonType: ["date", "null"],
-      },
-    },
-  },
-};
-
-ensureCollection("messages", { validator: messagesValidator });
-
-// índices para recuperar historial rápido
-db.messages.createIndex({ conversationId: 1, createdAt: 1 });
-print("✔ Índice en messages (conversationId, createdAt)");
-
-// ======================= SETTINGS =======================
-
-const settingsValidator = {
-  $jsonSchema: {
-    bsonType: "object",
-    required: ["key", "createdAt"],
-    properties: {
-      _id: { bsonType: "objectId" },
-      key: {
-        bsonType: "string",
-        description: "Clave de setting, ej: 'prompt.system'",
-      },
-      value: {
-        bsonType: ["string", "number", "object", "array", "bool", "null"],
-      },
-      scope: {
-        bsonType: ["string", "null"],
-        description: "Ámbito: global, tenant, etc.",
-      },
-      createdAt: { bsonType: "date" },
-      updatedAt: { bsonType: ["date", "null"] },
-    },
-  },
-};
-
-ensureCollection("settings", { validator: settingsValidator });
-
-// clave única por key + scope
-db.settings.createIndex({ key: 1, scope: 1 }, { unique: true });
-print("✔ Índice único en settings (key, scope)");
-
-// ======================== USAGE ========================
-
-const usageValidator = {
-  $jsonSchema: {
-    bsonType: "object",
-    required: ["provider", "model", "createdAt"],
-    properties: {
-      _id: { bsonType: "objectId" },
-      userId: {
-        bsonType: ["string", "null"],
-      },
-      conversationId: {
-        bsonType: ["string", "null"],
-      },
-      provider: {
-        bsonType: "string", // openai | gemini | deepseek | grok | ...
-      },
-      model: {
-        bsonType: "string",
-      },
-      inputTokens: {
-        bsonType: ["int", "long", "double", "null"],
-      },
-      outputTokens: {
-        bsonType: ["int", "long", "double", "null"],
-      },
-      totalTokens: {
-        bsonType: ["int", "long", "double", "null"],
-      },
-      createdAt: {
-        bsonType: "date",
-      },
-    },
-  },
-};
-
-ensureCollection("usage", { validator: usageValidator });
-
-// índices para analíticas
-db.usage.createIndex({ createdAt: -1 });
-db.usage.createIndex({ userId: 1, createdAt: -1 });
-db.usage.createIndex({ provider: 1, model: 1, createdAt: -1 });
-print("✔ Índices en usage (createdAt, userId, provider+model)");
-
-print("✅ Inicialización Mongo completada.");
+  { upsert: true }
+);

@@ -151,6 +151,24 @@ El backend quedará en:
 
 http://localhost:3000
 
+
+### Generar el hash de contraseña para el super admin del backoffice
+
+El super admin del backoffice utiliza contraseñas almacenadas con **bcrypt**.  
+Para crear o cambiar la contraseña, puedes usar el script `generar-hash.ts`.
+
+#### 1. Requisitos
+
+Asegúrate de tener instalados:
+
+```bash
+yarn add bcrypt
+yarn add -D ts-node typescript
+# o con npm:
+# npm install bcrypt
+# npm install --save-dev ts-node typescript
+
+
 -----------------------------------------------------------
 ## Documentación de instalación
 

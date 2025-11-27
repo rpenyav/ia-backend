@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>{{title}}</title>
+  <link rel="stylesheet" href="/static/backoffice.css" />
+  <style>
+    .login-card {
+      max-width: 380px;
+      margin: 80px auto;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+      padding: 24px 20px 28px;
+    }
+    .login-card h1 {
+      margin-top: 0;
+      margin-bottom: 4px;
+      font-size: 20px;
+    }
+    .login-card p.sub {
+      margin: 0 0 16px;
+      font-size: 13px;
+      color: #6b7280;
+    }
+    .field {
+      display: flex;
+      flex-direction: column;
+      margin-bottom: 12px;
+      font-size: 13px;
+    }
+    .field label {
+      margin-bottom: 4px;
+      color: #374151;
+    }
+    .field input {
+      padding: 8px 9px;
+      border-radius: 6px;
+      border: 1px solid #d1d5db;
+      font-size: 13px;
+    }
+    .error {
+      margin-bottom: 12px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      background: #fee2e2;
+      color: #b91c1c;
+      font-size: 13px;
+    }
+    .login-actions {
+      margin-top: 8px;
+      display: flex;
+      justify-content: flex-end;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <h1>Acceso backoffice</h1>
+    <p class="sub">Introduce tus credenciales de super admin</p>
+
+    {{#if error}}
+      <div class="error">{{error}}</div>
+    {{/if}}
+
+    <form method="POST" action="/backoffice/login">
+      <div class="field">
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" required />
+      </div>
+
+      <div class="field">
+        <label for="password">Contraseña</label>
+        <input id="password" name="password" type="password" required />
+      </div>
+
+      <div class="login-actions">
+        <button type="submit" class="btn-primary">Entrar</button>
+      </div>
+    </form>
+  </div>
+</body>
+</html>

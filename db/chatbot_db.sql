@@ -111,3 +111,90 @@ CREATE TABLE `usage` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 COMMIT;
+
+
+-- Tabla para variables de configuración gestionadas desde backoffice
+CREATE TABLE IF NOT EXISTS env_vars (
+  id          CHAR(36)      NOT NULL PRIMARY KEY,
+  `key`       VARCHAR(255)  NOT NULL UNIQUE,
+  `value`     TEXT          NOT NULL,
+  description VARCHAR(255)  NULL,
+  is_secret   TINYINT(1)    NOT NULL DEFAULT 0,
+  created_at  TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Seeds iniciales
+INSERT INTO env_vars (id, `key`, `value`, description, is_secret)
+VALUES
+  -- AUTENTICACIÓN GLOBAL
+  (UUID(), 'CHAT_AUTH_MODE', 'local', 'none | local | oauth2', 0),
+  (UUID(), 'AUTH_STRATEGY', 'none', 'none | api_key | oauth2', 0),
+  (UUID(), 'INTERNAL_API_KEY', 'CHANGE_ME_INTERNAL_API_KEY', 'API key interna para AUTH_STRATEGY=api_key', 1),
+
+  -- AUTH USUARIOS (JWT)
+  (UUID(), 'JWT_SECRET', 'CHANGE_ME_JWT_SECRET', 'JWT secret', 1),
+  (UUID(), 'JWT_EXPIRES_IN', '1h', 'TTL del JWT (p.ej. 1h, 2d)', 0),
+
+  -- IA – VALORES POR DEFECTO DE INSTALACIÓN
+  (UUID(), 'DEFAULT_LLM_PROVIDER', 'openai', 'Proveedor LLM por defecto (openai | grok | gemini | deepseek)', 0),
+  (UUID(), 'DEFAULT_LLM_MODEL', 'gpt-4o-mini', 'Modelo LLM por defecto', 0),
+  (UUID(), 'DEFAULT_LLM_TEMPERATURE', '0.2', 'Temperatura por defecto', 0),
+  (UUID(), 'DEFAULT_LLM_MAX_TOKENS', '200', 'Tokens máximos por defecto', 0),
+
+  -- IA – API KEYS (poner las reales desde backoffice)
+  (UUID(), 'OPENAI_API_KEY', 'CHANGE_ME_OPENAI', 'OpenAI API key', 1),
+  (UUID(), 'GEMINI_API_KEY', 'CHANGE_ME_GEMINI', 'Gemini API key', 1),
+  (UUID(), 'GROK_API_KEY', 'CHANGE_ME_GROK', 'Grok API key', 1),
+  (UUID(), 'DEEPSEEK_API_KEY', 'CHANGE_ME_DEEPSEEK', 'Deepseek API key', 1),
+
+  -- IA – BASE URLs
+  (UUID(), 'OPENAI_BASE_URL', 'https://api.openai.com/v1', 'Base URL OpenAI', 0),
+  (UUID(), 'GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta', 'Base URL Gemini', 0),
+  (UUID(), 'GROK_BASE_URL', 'https://api.x.ai/v1', 'Base URL Grok', 0),
+  (UUID(), 'DEEPSEEK_BASE_URL', 'https://api.deepseek.com/v1', 'Base URL Deepseek', 0),
+
+  -- PROXY CORPORATIVO
+  (UUID(), 'HTTP_PROXY', '', 'Proxy HTTP corporativo (opcional)', 0),
+  (UUID(), 'HTTPS_PROXY', '', 'Proxy HTTPS corporativo (opcional)', 0),
+
+  -- LOGGING / OBSERVABILIDAD
+  (UUID(), 'LOG_LEVEL', 'info', 'Nivel de logs (error | warn | info | debug)', 0),
+  (UUID(), 'HTTP_LOGGING_ENABLED', 'true', 'Logs HTTP habilitados', 0),
+  (UUID(), 'METRICS_ENABLED', 'false', 'Exponer métricas Prometheus', 0),
+  (UUID(), 'METRICS_PORT', '9100', 'Puerto para métricas', 0),
+
+  -- STORAGE
+  (UUID(), 'STORAGE_PROVIDER', 'cloudinary', 'cloudinary | s3 | local', 0),
+
+  (UUID(), 'CLOUDINARY_CLOUD_NAME', 'CHANGE_ME_CLOUD_NAME', 'Cloudinary cloud name', 0),
+  (UUID(), 'CLOUDINARY_API_KEY', 'CHANGE_ME_CLOUDINARY_API_KEY', 'Cloudinary API key', 1),
+  (UUID(), 'CLOUDINARY_API_SECRET', 'CHANGE_ME_CLOUDINARY_API_SECRET', 'Cloudinary API secret', 1),
+
+  (UUID(), 'S3_ENDPOINT', '', 'Endpoint S3/MinIO (opcional)', 0),
+  (UUID(), 'S3_REGION', '', 'Región S3', 0),
+  (UUID(), 'S3_BUCKET', '', 'Bucket S3/MinIO', 0),
+  (UUID(), 'S3_ACCESS_KEY_ID', '', 'Access key S3/MinIO', 1),
+  (UUID(), 'S3_SECRET_ACCESS_KEY', '', 'Secret key S3/MinIO', 1)
+ON DUPLICATE KEY UPDATE
+  -- NO tocamos value si ya existe (para no pisar cambios hechos desde backoffice)
+  description = VALUES(description),
+  is_secret   = VALUES(is_secret);
+
+
+CREATE TABLE IF NOT EXISTS backoffice_admins (
+  id            CHAR(36)      NOT NULL PRIMARY KEY,
+  email         VARCHAR(255)  NOT NULL UNIQUE,
+  password_hash VARCHAR(255)  NOT NULL,
+  created_at    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Super admin inicial (cambia el hash por uno real de bcrypt)
+INSERT INTO backoffice_admins (id, email, password_hash)
+VALUES (
+  UUID(),
+  'admin@backoffice.local',
+  '$2b$10$REEMPLAZA_ESTE_HASH_POR_EL_DE_TU_PASSWORD'
+)
+ON DUPLICATE KEY UPDATE email = email;

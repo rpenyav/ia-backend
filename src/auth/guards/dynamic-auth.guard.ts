@@ -1,3 +1,4 @@
+// src/auth/guards/dynamic-auth.guard.ts
 import {
   CanActivate,
   ExecutionContext,
@@ -8,6 +9,7 @@ import { Reflector } from "@nestjs/core";
 import { ConfigService } from "@nestjs/config";
 import { AuthStrategy } from "../auth-strategy.enum";
 import { IS_PUBLIC_KEY } from "../decorators/public.decorator";
+import { Request } from "express";
 
 @Injectable()
 export class DynamicAuthGuard implements CanActivate {
@@ -17,13 +19,26 @@ export class DynamicAuthGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    const request = context.switchToHttp().getRequest<Request>();
+
+    // 0) Rutas que NO deben pasar por la API key / estrategia global
+    const path = request.path || request.url || "";
+
+    if (
+      path.startsWith("/backoffice") || // login + dashboard + users + settings + env
+      path.startsWith("/static") // CSS, assets del backoffice
+    ) {
+      return true;
+    }
+
+    // 1) Rutas marcadas como públicas con el decorador @Public()
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
     ]);
     if (isPublic) return true;
 
-    const request = context.switchToHttp().getRequest();
+    // 2) Elegimos la estrategia desde config
     const strategy =
       (this.configService.get<AuthStrategy>("AUTH_STRATEGY") as AuthStrategy) ??
       AuthStrategy.API_KEY;
@@ -51,7 +66,7 @@ export class DynamicAuthGuard implements CanActivate {
       }
 
       case AuthStrategy.OAUTH2: {
-        if (request.user) return true;
+        if ((request as any).user) return true;
         throw new UnauthorizedException("Usuario no autenticado (OAuth2)");
       }
 

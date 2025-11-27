@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>{{title}}</title>
+  <link rel="stylesheet" href="/static/backoffice.css" />
+</head>
+<body>
+  <div class="layout">
+    <header>
+      <div>
+        <h1>{{title}}</h1>
+        <p>Gestión de variables de entorno desde BBDD</p>
+      </div>
+      <nav>
+        <a href="/backoffice">📊 Dashboard</a>
+        <a href="/backoffice/users">👤 Usuarios</a>
+        <a href="/backoffice/settings">⚙️ Settings</a>
+        <a href="/backoffice/env"><strong>🌱 Env vars</strong></a>
+
+        <form method="POST" action="/backoffice/logout" style="display:inline;">
+          <button type="submit" class="btn-link" style="margin-left: 12px;">Salir</button>
+        </form>
+      </nav>
+    </header>
+
+    <section class="card">
+      <h2>Variables de entorno</h2>
+
+      <form method="GET" action="/backoffice/env" class="filters">
+        <div class="row">
+          <div class="field">
+            <label>Buscar por clave o descripción</label>
+            <input
+              type="text"
+              name="q"
+              value="{{q}}"
+              placeholder="ej: DEFAULT_LLM_PROVIDER"
+            />
+          </div>
+
+          <div class="field">
+            <button type="submit" class="btn-primary">Buscar</button>
+            <a href="/backoffice/env" class="btn-link">Limpiar</a>
+          </div>
+        </div>
+      </form>
+
+      {{#if envVars.length}}
+        <table>
+          <thead>
+            <tr>
+              <th>Clave</th>
+              <th>Valor</th>
+              <th>Descripción</th>
+              <th>Secreto</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{#each envVars}}
+              <tr>
+                <td><code>{{this.key}}</code></td>
+                <td>
+                  {{#if this.isSecret}}
+                    <span class="muted">•••••• (secreto)</span>
+                  {{else}}
+                    <code>{{this.value}}</code>
+                  {{/if}}
+                </td>
+                <td>{{this.description}}</td>
+                <td>
+                  {{#if this.isSecret}}
+                    Sí
+                  {{else}}
+                    No
+                  {{/if}}
+                </td>
+                <td>
+                  <a href="/backoffice/env/{{this.id}}/edit">Editar</a>
+
+                  <form
+                    method="POST"
+                    action="/backoffice/env/{{this.id}}/delete"
+                    style="display:inline;"
+                    onsubmit="return confirm('¿Seguro que quieres borrar esta variable?');"
+                  >
+                    <button type="submit" class="btn-link">Borrar</button>
+                  </form>
+                </td>
+              </tr>
+            {{/each}}
+          </tbody>
+        </table>
+      {{else}}
+        <p class="muted">No hay variables (o no coinciden con la búsqueda).</p>
+      {{/if}}
+    </section>
+  </div>
+</body>
+</html>
