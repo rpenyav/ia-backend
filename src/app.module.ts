@@ -11,9 +11,11 @@ import { SettingsModule } from "./settings/settings.module";
 import { ConversationsModule } from "./conversations/conversations.module";
 import { StorageModule } from "./storage/storage.module";
 import { BackofficeModule } from "./backoffice/backoffice.module";
+import { ContactModule } from "./contact/contact.module";
 
 @Module({
   imports: [
+    ContactModule,
     ConfigModule,
     DatabaseModule.forRoot(),
     LlmModule,
