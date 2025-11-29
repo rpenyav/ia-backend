@@ -21,6 +21,7 @@ async function bootstrap() {
   //   allowedHeaders: "Content-Type, Authorization, x-api-key",
   //   credentials: true,
   // });
+
   app.enableCors({
     origin: true, // 👈 permite cualquier origen, devuelve el mismo Origin que llega
     methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
@@ -49,7 +50,7 @@ async function bootstrap() {
     })
   );
 
-  const port = process.env.PORT || 3000;
+  const port = process.env.PORT || 8080;
   await app.listen(port);
   console.log(`🚀 App listening on port ${port}`);
 }
