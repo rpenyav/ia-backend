@@ -7,9 +7,15 @@ import {
 import { CreateContactDto } from "./dto/create-contact.dto";
 import * as nodemailer from "nodemailer";
 
+type EmailTransportMode = "smtp" | "log";
+
 @Injectable()
 export class ContactService {
   private readonly logger = new Logger(ContactService.name);
+
+  // 👇 por defecto "log" para que en Railway NO intente usar SMTP
+  private readonly mode: EmailTransportMode =
+    (process.env.EMAIL_TRANSPORT as EmailTransportMode) || "log";
 
   private readonly toEmail = process.env.CONTACT_RECIPIENT_EMAIL;
   private readonly smtpHost = process.env.SMTP_HOST;
@@ -19,22 +25,29 @@ export class ContactService {
   private readonly smtpFrom =
     process.env.SMTP_FROM || this.toEmail || "no-reply@example.com";
 
-  private readonly transporter = nodemailer.createTransport({
-    host: this.smtpHost,
-    port: this.smtpPort,
-    secure: this.smtpPort === 465, // true para 465, false para 587/25
-    auth:
-      this.smtpUser && this.smtpPass
-        ? {
-            user: this.smtpUser,
-            pass: this.smtpPass,
-          }
-        : undefined,
-  });
+  // Solo creamos el transporter si estamos en modo SMTP
+  private createSmtpTransport() {
+    if (!this.smtpHost) {
+      throw new Error("SMTP_HOST no definido");
+    }
+
+    return nodemailer.createTransport({
+      host: this.smtpHost,
+      port: this.smtpPort,
+      secure: this.smtpPort === 465, // true para 465, false para 587/25
+      auth:
+        this.smtpUser && this.smtpPass
+          ? {
+              user: this.smtpUser,
+              pass: this.smtpPass,
+            }
+          : undefined,
+    });
+  }
 
   async handleContact(dto: CreateContactDto, ip?: string) {
     try {
-      // 1) Log para tener trazas igualmente
+      // 1) Log común siempre
       this.logger.log("Nuevo lead de contacto NERIA:");
       this.logger.log(
         JSON.stringify(
@@ -57,8 +70,18 @@ export class ContactService {
         return { ok: true };
       }
 
-      // 3) Enviar email
-      await this.transporter.sendMail({
+      // 3) Si estamos en modo "log", NO usamos SMTP (ideal en Railway)
+      if (this.mode === "log") {
+        this.logger.warn(
+          "EMAIL_TRANSPORT=log → se registra el lead pero NO se envía correo."
+        );
+        return { ok: true };
+      }
+
+      // 4) Modo SMTP (solo lo uses cuando estés en un hosting que lo permita)
+      const transporter = this.createSmtpTransport();
+
+      await transporter.sendMail({
         to: this.toEmail,
         from: this.smtpFrom,
         subject: `Nuevo contacto NERIA de ${dto.name}`,
