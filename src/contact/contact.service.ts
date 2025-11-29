@@ -5,45 +5,24 @@ import {
   Logger,
 } from "@nestjs/common";
 import { CreateContactDto } from "./dto/create-contact.dto";
-import * as nodemailer from "nodemailer";
+import axios from "axios";
 
-type EmailTransportMode = "smtp" | "log";
+type EmailTransportMode = "log" | "resend";
 
 @Injectable()
 export class ContactService {
   private readonly logger = new Logger(ContactService.name);
 
-  // 👇 por defecto "log" para que en Railway NO intente usar SMTP
   private readonly mode: EmailTransportMode =
     (process.env.EMAIL_TRANSPORT as EmailTransportMode) || "log";
 
   private readonly toEmail = process.env.CONTACT_RECIPIENT_EMAIL;
-  private readonly smtpHost = process.env.SMTP_HOST;
-  private readonly smtpPort = Number(process.env.SMTP_PORT || 587);
-  private readonly smtpUser = process.env.SMTP_USER;
-  private readonly smtpPass = process.env.SMTP_PASS;
-  private readonly smtpFrom =
-    process.env.SMTP_FROM || this.toEmail || "no-reply@example.com";
+  private readonly fromEmail =
+    process.env.EMAIL_FROM ||
+    process.env.SMTP_FROM || // por si ya lo tenías
+    "NERIA Website <no-reply@example.com>";
 
-  // Solo creamos el transporter si estamos en modo SMTP
-  private createSmtpTransport() {
-    if (!this.smtpHost) {
-      throw new Error("SMTP_HOST no definido");
-    }
-
-    return nodemailer.createTransport({
-      host: this.smtpHost,
-      port: this.smtpPort,
-      secure: this.smtpPort === 465, // true para 465, false para 587/25
-      auth:
-        this.smtpUser && this.smtpPass
-          ? {
-              user: this.smtpUser,
-              pass: this.smtpPass,
-            }
-          : undefined,
-    });
-  }
+  private readonly resendApiKey = process.env.RESEND_API_KEY;
 
   async handleContact(dto: CreateContactDto, ip?: string) {
     try {
@@ -62,7 +41,7 @@ export class ContactService {
         )
       );
 
-      // 2) Si no hay email de destino, no intentamos enviar nada
+      // 2) Sin email de destino, no hacemos nada más
       if (!this.toEmail) {
         this.logger.warn(
           "CONTACT_RECIPIENT_EMAIL no está definido. No se enviará correo."
@@ -70,7 +49,7 @@ export class ContactService {
         return { ok: true };
       }
 
-      // 3) Si estamos en modo "log", NO usamos SMTP (ideal en Railway)
+      // 3) Modo LOG → solo registrar, sin enviar correo
       if (this.mode === "log") {
         this.logger.warn(
           "EMAIL_TRANSPORT=log → se registra el lead pero NO se envía correo."
@@ -78,20 +57,41 @@ export class ContactService {
         return { ok: true };
       }
 
-      // 4) Modo SMTP (solo lo uses cuando estés en un hosting que lo permita)
-      const transporter = this.createSmtpTransport();
+      // 4) Modo RESEND → usamos la API HTTP
+      if (this.mode === "resend") {
+        if (!this.resendApiKey) {
+          this.logger.error("RESEND_API_KEY no está definida");
+          throw new InternalServerErrorException(
+            "Configuración de correo inválida"
+          );
+        }
 
-      await transporter.sendMail({
-        to: this.toEmail,
-        from: this.smtpFrom,
-        subject: `Nuevo contacto NERIA de ${dto.name}`,
-        text: this.buildPlainText(dto, ip),
-        html: this.buildHtml(dto, ip),
-      });
+        await axios.post(
+          "https://api.resend.com/emails",
+          {
+            from: this.fromEmail,
+            to: [this.toEmail],
+            subject: `Nuevo contacto NERIA de ${dto.name}`,
+            text: this.buildPlainText(dto, ip),
+            html: this.buildHtml(dto, ip),
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${this.resendApiKey}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
 
-      this.logger.log(`Email de contacto enviado a ${this.toEmail}`);
+        this.logger.log(`Email de contacto enviado a ${this.toEmail}`);
+        return { ok: true };
+      }
 
-      return { ok: true };
+      // 5) Si mode no es válido (por si acaso)
+      this.logger.error(`EMAIL_TRANSPORT desconocido: ${this.mode}`);
+      throw new InternalServerErrorException(
+        "Configuración de correo inválida"
+      );
     } catch (err) {
       this.logger.error("Error procesando contacto", err as any);
       throw new InternalServerErrorException(
