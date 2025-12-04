@@ -357,7 +357,7 @@ Responde SOLO con el JSON, sin texto adicional.
 
     const wantsCars = analysis?.wantsCars ?? heuristicWantsCars;
 
-    // Bloque DEBUG base (lo veremos en la respuesta para entender qué pasa)
+    // Bloque DEBUG base (para logs si hiciera falta)
     const debugBase = {
       analysis,
       heuristicWantsCars,
@@ -413,11 +413,11 @@ Responde SOLO con el JSON, sin texto adicional.
     // ✅ Transformamos productos a un shape específico para el chat,
     //   incluyendo mainImage = última imagen del array (o imageUrl si no hay array).
     const productsForChat = products.map((p) => {
-      const images = p.images ?? [];
+      const images = (p as any).images ?? [];
       const hasImagesArray = Array.isArray(images) && images.length > 0;
 
       const mainImage = hasImagesArray
-        ? images[images.length - 1] // 👈 última del array
+        ? images[images.length - 1] // última del array
         : (p.imageUrl ?? null); // fallback
 
       return {
@@ -437,45 +437,70 @@ Responde SOLO con el JSON, sin texto adicional.
         color: p.color,
         description: p.description,
         mainImage,
-        productLink: p.productLink ?? null,
+        productLink: (p as any).productLink ?? null,
       };
     });
 
-    const debugInfo = JSON.stringify(
-      {
-        ...debugBase,
-        filters,
-        productsCount: products.length,
-      },
-      null,
-      2
-    );
+    // Plantilla HTML para la card del coche
+    const carHtmlTemplate = `
+<div class="iachat-car-card">
+  <p class="iachat-car-card-intro">[TEXTO_INTRO]</p>
+  <div class="iachat-car-card-body">
+    <div class="iachat-car-card-left">
+      <img src="[MAIN_IMAGE_URL]" alt="[NOMBRE_COMPLETO]" class="iachat-car-card-image" />
+      <!-- Si NO hay productLink, NO incluyas este enlace -->
+      <a href="[PRODUCT_LINK]" target="_blank" rel="noopener noreferrer" class="iachat-car-card-link">
+        <span class="iachat-car-card-link-icon">✓</span>
+        <span>Ficha del vehículo</span>
+      </a>
+    </div>
+    <div class="iachat-car-card-right">
+      <h3 class="iachat-car-card-title">[NOMBRE_COMPLETO]</h3>
+      <ul class="iachat-car-card-list">
+        <li><strong>Precio:</strong> [PRECIO]</li>
+        <li><strong>Tipo de combustible:</strong> [COMBUSTIBLE]</li>
+        <li><strong>Kilometraje:</strong> [KILOMETRAJE]</li>
+        <li><strong>Categoría:</strong> [CATEGORIA]</li>
+        <li><strong>Asientos:</strong> [ASIENTOS]</li>
+        <li><strong>Puertas:</strong> [PUERTAS]</li>
+        <li><strong>Color:</strong> [COLOR]</li>
+        <li><strong>Descripción:</strong> [DESCRIPCION]</li>
+      </ul>
+    </div>
+  </div>
+</div>
+`.trim();
 
     const systemForAnswer =
       systemPrompt +
       "\n\n" +
-      "INSTRUCCIONES ESPECÍFICAS PARA CONSULTAS DE COCHES:\n" +
+      "INSTRUCCIONES ESPECÍFICAS PARA CONSULTAS DE COCHES (SALIDA HTML):\n" +
       "- Dispones de un catálogo interno de coches proporcionado en formato JSON en el mensaje del usuario.\n" +
       "- Esos datos proceden de la base de datos del cliente y SON FIABLES.\n" +
       "- Debes basar tus recomendaciones EXCLUSIVAMENTE en ese JSON.\n" +
-      "- Cada coche tiene un campo 'mainImage' (URL de imagen) y opcionalmente 'productLink' (URL de la ficha en la web).\n" +
-      "- Si HAY al menos un coche con 'productLink' NO nulo, DEBES añadir al final de la respuesta una línea con un enlace Markdown a la ficha del coche.\n" +
-      "- Si SOLO hay 1 coche en la lista, usa SU 'productLink'.\n" +
-      "- Usa EXACTAMENTE este formato (sustituyendo la URL por el valor de 'productLink'):\n" +
-      "  Puedes ver más detalles aquí: [Ver ficha del vehículo](PRODUCT_LINK_AQUI)\n" +
-      "- No inventes URLs. Si el campo 'productLink' no existe o es null para TODOS los coches, entonces NO añadas ningún enlace.\n" +
-      "- No digas que no tienes acceso a información actualizada si el JSON contiene resultados.\n";
+      "- Cuando respondas sobre coches, tu salida debe ser SIEMPRE un ÚNICO bloque HTML con ESTA PLANTILLA (rellenando los huecos entre corchetes):\n\n" +
+      carHtmlTemplate +
+      "\n\n" +
+      "REGLAS DE FORMATO MUY IMPORTANTES:\n" +
+      '- No escribas NADA fuera del <div class="iachat-car-card">...</div>.\n' +
+      "- Sustituye [TEXTO_INTRO], [NOMBRE_COMPLETO], [PRECIO], etc. por los datos reales del coche recomendado.\n" +
+      "- Usa el coche que mejor encaje con la búsqueda (normalmente el primero de la lista).\n" +
+      "- [MAIN_IMAGE_URL] debe ser la propiedad 'mainImage' del coche.\n" +
+      "- Si 'productLink' es null o no existe, ELIMINA completamente el enlace <a> (no pongas un enlace vacío).\n" +
+      "- Si 'productLink' tiene valor, usa exactamente ese valor en href.\n" +
+      "- No añadas párrafos extras ni texto después del bloque HTML.\n";
 
     const userContent =
       `Pregunta del usuario:\n` +
       userMessage +
       `\n\n` +
       `A continuación tienes la lista de coches del CATÁLOGO INTERNO que cumplen (o casi cumplen) los filtros del usuario, en formato JSON.\n` +
-      `Cada coche incluye un campo 'mainImage' con UNA sola URL lista para usar en la respuesta:\n` +
+      `Cada coche incluye un campo 'mainImage' con UNA sola URL de imagen lista para usar y, opcionalmente, 'productLink' con la URL de la ficha en la web:\n` +
       JSON.stringify(productsForChat, null, 2) +
       `\n\n` +
-      `Si la lista está vacía ([]), dile al usuario que no hay coches que cumplan exactamente sus filtros y sugiérele ajustes.\n` +
-      `Si la lista NO está vacía, DEBES recomendar modelos concretos de esta lista (menciona marca, modelo, precio, tipo de combustible y usa 'mainImage' para mostrar una imagen en Markdown).`;
+      `Si la lista está vacía ([]), indica en el HTML que no hay coches que cumplan exactamente sus filtros y sugiérele ajustes (más presupuesto, otra categoría, etc.), pero mantén la estructura del div.\n` +
+      `Si la lista NO está vacía, rellena la plantilla HTML con los datos de un coche de la lista.`;
+
     const messages: LlmMessage[] = [
       { role: "system", content: systemForAnswer },
       { role: "user", content: userContent },
