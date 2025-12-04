@@ -410,6 +410,36 @@ Responde SOLO con el JSON, sin texto adicional.
 
     const products = await this.productsService.searchForChat(filters);
 
+    // ✅ Transformamos productos a un shape específico para el chat,
+    //   incluyendo mainImage = última imagen del array (o imageUrl si no hay array).
+    const productsForChat = products.map((p) => {
+      const images = p.images ?? [];
+      const hasImagesArray = Array.isArray(images) && images.length > 0;
+
+      const mainImage = hasImagesArray
+        ? images[images.length - 1] // 👈 última del array
+        : (p.imageUrl ?? null); // fallback
+
+      return {
+        id: p.id,
+        name: p.name,
+        brand: p.brand,
+        model: p.model,
+        year: p.year,
+        price: p.price,
+        mileage: p.mileage,
+        category: p.vehicleCategory?.name,
+        categorySlug: p.vehicleCategory?.slug,
+        fuelType: p.fuelType,
+        gearbox: p.gearbox,
+        seats: p.seats,
+        doors: p.doors,
+        color: p.color,
+        description: p.description,
+        mainImage, // 👈 aquí va la lógica que pedías
+      };
+    });
+
     const debugInfo = JSON.stringify(
       {
         ...debugBase,
@@ -427,24 +457,26 @@ Responde SOLO con el JSON, sin texto adicional.
       "- Dispones de un catálogo interno de coches proporcionado en formato JSON en el mensaje del usuario.\n" +
       "- Esos datos (modelos, precios, combustible, categoría...) proceden de la base de datos del cliente y SON FIABLES.\n" +
       "- Debes basar tus recomendaciones EXCLUSIVAMENTE en ese JSON.\n" +
+      "- Cada coche tiene un campo 'mainImage' que ya contiene la URL de UNA sola imagen para mostrar al usuario.\n" +
+      "- Cuando recomiendes coches, deja claro que forman parte de NUESTRO CATÁLOGO, usando expresiones como\n" +
+      '  \"de nuestro catálogo de SUV\", \"de nuestro catálogo de vehículos\" o similares.\n' +
+      "- Siempre que tenga sentido, puedes empezar la respuesta con una frase del estilo:\n" +
+      '  \"Te recomiendo X opciones de nuestro catálogo de SUV que se ajustan a tu presupuesto de Y euros:\".\n' +
       "- Si el listado NO está vacío, está TERMINANTEMENTE PROHIBIDO decir frases como\n" +
       '  \"no tengo acceso a información actualizada\" o similares. En su lugar, recomienda modelos concretos del catálogo.\n' +
       "- Si el listado está vacío, explícale al usuario que ahora mismo no hay coches que cumplan sus filtros y sugiérele cambios razonables (más presupuesto, otra categoría, etc.).\n" +
-      "\n[DEBUG INTERNO - CATALOGO COCHES]\n" +
-      debugInfo +
-      "\nNO menciones esta sección DEBUG al usuario final. Solo úsala para entender el contexto.";
+      "- Para mostrar la imagen de un coche, usa la sintaxis Markdown: `![Nombre del coche](URL_DE_mainImage)`.\n";
 
     const userContent =
       `Pregunta del usuario:\n` +
       userMessage +
       `\n\n` +
       `A continuación tienes la lista de coches del CATÁLOGO INTERNO que cumplen (o casi cumplen) los filtros del usuario, en formato JSON.\n` +
-      `SOLO puedes usar estos coches para hacer recomendaciones:\n` +
-      JSON.stringify(products, null, 2) +
+      `Cada coche incluye un campo 'mainImage' con UNA sola URL lista para usar en la respuesta:\n` +
+      JSON.stringify(productsForChat, null, 2) +
       `\n\n` +
       `Si la lista está vacía ([]), dile al usuario que no hay coches que cumplan exactamente sus filtros y sugiérele ajustes.\n` +
-      `Si la lista NO está vacía, DEBES recomendar modelos concretos de esta lista (menciona marca, modelo, precio y tipo de combustible).`;
-
+      `Si la lista NO está vacía, DEBES recomendar modelos concretos de esta lista (menciona marca, modelo, precio, tipo de combustible y usa 'mainImage' para mostrar una imagen en Markdown).`;
     const messages: LlmMessage[] = [
       { role: "system", content: systemForAnswer },
       { role: "user", content: userContent },

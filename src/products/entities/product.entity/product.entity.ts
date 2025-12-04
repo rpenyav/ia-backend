@@ -63,8 +63,13 @@ export class Product {
   @Column({ length: 50, nullable: true })
   color?: string;
 
+  // ✅ imagen “legacy” (una sola)
   @Column({ length: 500, nullable: true })
   imageUrl?: string;
+
+  // ✅ NUEVO: array de imágenes (URLs) en BBDD (JSON)
+  @Column({ type: "json", nullable: true })
+  images?: string[];
 
   @Column({ type: "text", nullable: true })
   description?: string;

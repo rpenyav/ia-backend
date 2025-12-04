@@ -1,5 +1,6 @@
 // src/products/dto/create-product.dto.ts
 import {
+  IsArray,
   IsBoolean,
   IsInt,
   IsNotEmpty,
@@ -72,9 +73,16 @@ export class CreateProductDto {
   @MaxLength(50)
   color?: string;
 
+  // ✅ legacy: una sola imagen
   @IsOptional()
   @IsUrl()
   imageUrl?: string;
+
+  // ✅ NUEVO: array de imágenes
+  @IsOptional()
+  @IsArray()
+  @IsUrl({}, { each: true })
+  images?: string[];
 
   @IsOptional()
   @IsString()
