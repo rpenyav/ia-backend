@@ -459,10 +459,11 @@ Responde SOLO con el JSON, sin texto adicional.
       "- Esos datos proceden de la base de datos del cliente y SON FIABLES.\n" +
       "- Debes basar tus recomendaciones EXCLUSIVAMENTE en ese JSON.\n" +
       "- Cada coche tiene un campo 'mainImage' (URL de imagen) y opcionalmente 'productLink' (URL de la ficha en la web).\n" +
-      "- Si SOLO hay 1 coche en la lista y ese coche tiene 'productLink', añade al final de la respuesta una línea con un enlace Markdown:\n" +
-      "  [Ver este coche en nuestra web](PRODUCT_LINK_AQUI)\n" +
-      "- Ese enlace debe apuntar exactamente al valor de 'productLink'.\n" +
-      "- Si hay varios coches, puedes no mostrar enlaces o mostrar uno por coche, según lo veas más útil.\n" +
+      "- Si HAY al menos un coche con 'productLink' NO nulo, DEBES añadir al final de la respuesta una línea con un enlace Markdown a la ficha del coche.\n" +
+      "- Si SOLO hay 1 coche en la lista, usa SU 'productLink'.\n" +
+      "- Usa EXACTAMENTE este formato (sustituyendo la URL por el valor de 'productLink'):\n" +
+      "  Puedes ver más detalles aquí: [Ver ficha del vehículo](PRODUCT_LINK_AQUI)\n" +
+      "- No inventes URLs. Si el campo 'productLink' no existe o es null para TODOS los coches, entonces NO añadas ningún enlace.\n" +
       "- No digas que no tienes acceso a información actualizada si el JSON contiene resultados.\n";
 
     const userContent =
