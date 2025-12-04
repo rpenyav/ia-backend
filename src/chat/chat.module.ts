@@ -11,11 +11,14 @@ import { PdfIngestionService } from "../doc-ingestion/pdf-ingestion.service";
 import { DocxIngestionService } from "../doc-ingestion/docx-ingestion.service";
 import { CsvIngestionService } from "../doc-ingestion/csv-ingestion.service";
 
+import { ProductsModule } from "../products/products.module"; // 👈 mejor relativo que "src/"
+
 @Module({
   imports: [
     ConversationsModule,
     LlmModule,
     SettingsModule.register(), // SettingsService para PromptService
+    ProductsModule, // 👈 AQUÍ va el módulo con ProductsService
   ],
   controllers: [ChatController],
   providers: [
@@ -24,6 +27,7 @@ import { CsvIngestionService } from "../doc-ingestion/csv-ingestion.service";
     PdfIngestionService,
     DocxIngestionService,
     CsvIngestionService,
+    // ❌ ProductsModule NO va aquí, es un módulo, no un provider
   ],
   exports: [ChatService],
 })

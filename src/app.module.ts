@@ -12,6 +12,8 @@ import { ConversationsModule } from "./conversations/conversations.module";
 import { StorageModule } from "./storage/storage.module";
 import { BackofficeModule } from "./backoffice/backoffice.module";
 import { ContactModule } from "./contact/contact.module";
+import { CategoriesModule } from './categories/categories.module';
+import { ProductsModule } from './products/products.module';
 
 @Module({
   imports: [
@@ -26,6 +28,8 @@ import { ContactModule } from "./contact/contact.module";
     ConversationsModule,
     BackofficeModule,
     StorageModule,
+    CategoriesModule,
+    ProductsModule,
   ],
 })
 export class AppModule {}

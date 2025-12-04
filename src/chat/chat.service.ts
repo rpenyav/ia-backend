@@ -16,7 +16,21 @@ import { PdfIngestionService } from "../doc-ingestion/pdf-ingestion.service";
 import { DocxIngestionService } from "../doc-ingestion/docx-ingestion.service";
 import { CsvIngestionService } from "../doc-ingestion/csv-ingestion.service";
 
+import {
+  ProductsService,
+  ChatProductSearchFilters,
+} from "../products/products.service";
+
 type ChatAuthMode = "none" | "local" | "oauth2";
+
+interface CarQueryAnalysis {
+  wantsCars: boolean;
+  categorySlug?: string | null;
+  brand?: string | null;
+  fuelType?: string | null;
+  gearbox?: string | null;
+  maxPrice?: number | null;
+}
 
 @Injectable()
 export class ChatService {
@@ -27,7 +41,8 @@ export class ChatService {
     private readonly promptService: PromptService,
     private readonly pdfIngestion: PdfIngestionService,
     private readonly docxIngestion: DocxIngestionService,
-    private readonly csvIngestion: CsvIngestionService
+    private readonly csvIngestion: CsvIngestionService,
+    private readonly productsService: ProductsService
   ) {}
 
   async *streamMessage(params: {
@@ -54,18 +69,16 @@ export class ChatService {
         );
       }
 
-      const messages: LlmMessage[] = [
-        { role: "system", content: baseSystemPrompt },
-        { role: "user", content: params.message },
-      ];
-
-      for await (const delta of this.llm.streamChat({
-        messages,
+      // Usamos el helper que decide si tira del catálogo de coches o no
+      for await (const delta of this.generateWithOptionalCatalog({
+        systemPrompt: baseSystemPrompt,
+        userMessage: params.message,
         userId: null,
         conversationId: null,
       })) {
         yield delta;
       }
+
       return;
     }
 
@@ -214,21 +227,12 @@ export class ChatService {
       .map((a) => a.url)
       .filter((u): u is string => !!u);
 
-    const messages: LlmMessage[] = [
-      {
-        role: "system",
-        content: enrichedPrompt,
-      },
-      {
-        role: "user",
-        content: params.message,
-      },
-    ];
-
     let fullAssistantText = "";
 
-    for await (const delta of this.llm.streamChat({
-      messages,
+    // Usamos el helper que decide si tirar del catálogo de coches o no
+    for await (const delta of this.generateWithOptionalCatalog({
+      systemPrompt: enrichedPrompt,
+      userMessage: params.message,
       userId,
       conversationId: conversationIdToUse,
       imageUrls: imageUrls.length ? imageUrls : undefined,
@@ -246,5 +250,213 @@ export class ChatService {
       content: fullAssistantText,
       attachments: [],
     });
+  }
+
+  private async extractCarFilters(
+    userMessage: string
+  ): Promise<CarQueryAnalysis | null> {
+    const systemPrompt = `
+Eres un analizador de consultas de un usuario que puede estar buscando coches
+de un catálogo interno.
+
+Tu único trabajo es decidir si la consulta del usuario está relacionada con
+buscar o recomendar coches del catálogo, y extraer filtros básicos.
+
+Debes devolver EXCLUSIVAMENTE un JSON con este formato:
+
+{
+  "wantsCars": boolean,
+  "categorySlug": string | null,   // "suv", "berlina", "compacto", etc. en minúsculas
+  "brand": string | null,          // marca si se menciona (ej. "Toyota")
+  "fuelType": string | null,       // "gasolina", "diésel", "híbrido", "eléctrico"
+  "gearbox": string | null,        // "manual" o "automático"
+  "maxPrice": number | null        // precio máximo en euros
+}
+
+REGLAS IMPORTANTES:
+- "wantsCars" = true SIEMPRE que el usuario hable de:
+  - coche, coches, vehículo, vehiculo, auto, automóvil, automovil
+  - SUV, todocamino, todoterreno, berlina, compacto, monovolumen, furgoneta
+  - pedir recomendación de un coche, modelo, coche familiar, coche para ciudad, etc.
+- Solo "wantsCars" = false cuando la pregunta NO tiene nada que ver con coches.
+
+EJEMPLOS (wantsCars = true):
+- "Quiero un SUV por menos de 25.000 euros" → categorySlug: "suv", maxPrice: 25000
+- "Busco un coche compacto para ciudad, a buen precio" → categorySlug: "compacto"
+- "¿Qué berlina eléctrica me recomiendas?" → categorySlug: "berlina", fuelType: "eléctrico"
+- "Tenéis algún Toyota híbrido?" → brand: "Toyota", fuelType: "híbrido"
+
+EJEMPLOS (wantsCars = false):
+- "Explícame la diferencia entre IA generativa y un CRM"
+- "¿Qué es NERIA?"
+
+Responde SOLO con el JSON, sin texto adicional.
+`.trim();
+
+    const messages: LlmMessage[] = [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userMessage },
+    ];
+
+    let raw = "";
+
+    // usamos el orquestador normal, pero acumulando todo el texto
+    for await (const delta of this.llm.streamChat({
+      messages,
+      temperature: 0,
+      maxTokens: 300,
+      userId: null,
+      conversationId: null,
+    })) {
+      raw += delta;
+    }
+
+    // Intentamos sacar JSON aunque venga envuelto
+    const start = raw.indexOf("{");
+    const end = raw.lastIndexOf("}");
+    if (start === -1 || end === -1 || end <= start) {
+      return null;
+    }
+
+    const jsonText = raw.slice(start, end + 1);
+
+    try {
+      const parsed = JSON.parse(jsonText) as Partial<CarQueryAnalysis>;
+      return {
+        wantsCars: !!parsed.wantsCars,
+        categorySlug: parsed.categorySlug ?? null,
+        brand: parsed.brand ?? null,
+        fuelType: parsed.fuelType ?? null,
+        gearbox: parsed.gearbox ?? null,
+        maxPrice: parsed.maxPrice ?? null,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  private async *generateWithOptionalCatalog(params: {
+    systemPrompt: string;
+    userMessage: string;
+    userId: string | null;
+    conversationId: string | null;
+    imageUrls?: string[];
+  }): AsyncGenerator<string> {
+    const { systemPrompt, userMessage, userId, conversationId, imageUrls } =
+      params;
+
+    // 1) Intentamos ver si es una consulta de coches y sacar filtros
+    const analysis = await this.extractCarFilters(userMessage);
+
+    // Heurística extra por si el modelo se lía
+    const lower = userMessage.toLowerCase();
+    const heuristicWantsCars =
+      /coche|coches|vehiculo|vehículo|auto|automovil|automóvil|suv|berlina|compacto|todoterreno|todocamino/.test(
+        lower
+      );
+
+    const wantsCars = analysis?.wantsCars ?? heuristicWantsCars;
+
+    // Bloque DEBUG base (lo veremos en la respuesta para entender qué pasa)
+    const debugBase = {
+      analysis,
+      heuristicWantsCars,
+      wantsCars,
+    };
+
+    if (!wantsCars) {
+      // 🔸 No va de coches → flujo normal, pero metemos info DEBUG para ver qué ha pensado
+      const debugInfo = JSON.stringify(debugBase, null, 2);
+
+      const messages: LlmMessage[] = [
+        {
+          role: "system",
+          content:
+            systemPrompt +
+            "\n\n[DEBUG INTERNO - CATALOGO COCHES]\n" +
+            debugInfo +
+            "\n\nNO menciones esta sección DEBUG al usuario final. Solo úsala para entender el contexto.",
+        },
+        {
+          role: "user",
+          content: userMessage,
+        },
+      ];
+
+      for await (const delta of this.llm.streamChat({
+        messages,
+        userId: userId ?? undefined,
+        conversationId: conversationId ?? undefined,
+        imageUrls: imageUrls && imageUrls.length ? imageUrls : undefined,
+      })) {
+        yield delta;
+      }
+      return;
+    }
+
+    // 2) Sí va de coches → usamos catálogo
+    const filters: ChatProductSearchFilters = {
+      categorySlug:
+        analysis?.categorySlug ||
+        (lower.includes("suv") ? "suv" : undefined) ||
+        (lower.includes("berlina") ? "berlina" : undefined) ||
+        (lower.includes("compacto") ? "compacto" : undefined),
+      brand: analysis?.brand || undefined,
+      fuelType: analysis?.fuelType || undefined,
+      gearbox: analysis?.gearbox || undefined,
+      maxPrice: analysis?.maxPrice || undefined,
+      limit: 5,
+    };
+
+    const products = await this.productsService.searchForChat(filters);
+
+    const debugInfo = JSON.stringify(
+      {
+        ...debugBase,
+        filters,
+        productsCount: products.length,
+      },
+      null,
+      2
+    );
+
+    const systemForAnswer =
+      systemPrompt +
+      "\n\n" +
+      "INSTRUCCIONES ESPECÍFICAS PARA CONSULTAS DE COCHES:\n" +
+      "- Dispones de un catálogo interno de coches proporcionado en formato JSON en el mensaje del usuario.\n" +
+      "- Esos datos (modelos, precios, combustible, categoría...) proceden de la base de datos del cliente y SON FIABLES.\n" +
+      "- Debes basar tus recomendaciones EXCLUSIVAMENTE en ese JSON.\n" +
+      "- Si el listado NO está vacío, está TERMINANTEMENTE PROHIBIDO decir frases como\n" +
+      '  \"no tengo acceso a información actualizada\" o similares. En su lugar, recomienda modelos concretos del catálogo.\n' +
+      "- Si el listado está vacío, explícale al usuario que ahora mismo no hay coches que cumplan sus filtros y sugiérele cambios razonables (más presupuesto, otra categoría, etc.).\n" +
+      "\n[DEBUG INTERNO - CATALOGO COCHES]\n" +
+      debugInfo +
+      "\nNO menciones esta sección DEBUG al usuario final. Solo úsala para entender el contexto.";
+
+    const userContent =
+      `Pregunta del usuario:\n` +
+      userMessage +
+      `\n\n` +
+      `A continuación tienes la lista de coches del CATÁLOGO INTERNO que cumplen (o casi cumplen) los filtros del usuario, en formato JSON.\n` +
+      `SOLO puedes usar estos coches para hacer recomendaciones:\n` +
+      JSON.stringify(products, null, 2) +
+      `\n\n` +
+      `Si la lista está vacía ([]), dile al usuario que no hay coches que cumplan exactamente sus filtros y sugiérele ajustes.\n` +
+      `Si la lista NO está vacía, DEBES recomendar modelos concretos de esta lista (menciona marca, modelo, precio y tipo de combustible).`;
+
+    const messages: LlmMessage[] = [
+      { role: "system", content: systemForAnswer },
+      { role: "user", content: userContent },
+    ];
+
+    for await (const delta of this.llm.streamChat({
+      messages,
+      userId: userId ?? undefined,
+      conversationId: conversationId ?? undefined,
+      imageUrls: imageUrls && imageUrls.length ? imageUrls : undefined,
+    })) {
+      yield delta;
+    }
   }
 }
