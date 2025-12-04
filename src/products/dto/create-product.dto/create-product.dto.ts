@@ -93,6 +93,10 @@ export class CreateProductDto {
   slug: string;
 
   @IsOptional()
+  @IsUrl()
+  productLink?: string;
+
+  @IsOptional()
   @Type(() => Boolean)
   @IsBoolean()
   active?: boolean;

@@ -436,7 +436,8 @@ Responde SOLO con el JSON, sin texto adicional.
         doors: p.doors,
         color: p.color,
         description: p.description,
-        mainImage, // 👈 aquí va la lógica que pedías
+        mainImage,
+        productLink: p.productLink ?? null,
       };
     });
 
@@ -455,17 +456,14 @@ Responde SOLO con el JSON, sin texto adicional.
       "\n\n" +
       "INSTRUCCIONES ESPECÍFICAS PARA CONSULTAS DE COCHES:\n" +
       "- Dispones de un catálogo interno de coches proporcionado en formato JSON en el mensaje del usuario.\n" +
-      "- Esos datos (modelos, precios, combustible, categoría...) proceden de la base de datos del cliente y SON FIABLES.\n" +
+      "- Esos datos proceden de la base de datos del cliente y SON FIABLES.\n" +
       "- Debes basar tus recomendaciones EXCLUSIVAMENTE en ese JSON.\n" +
-      "- Cada coche tiene un campo 'mainImage' que ya contiene la URL de UNA sola imagen para mostrar al usuario.\n" +
-      "- Cuando recomiendes coches, deja claro que forman parte de NUESTRO CATÁLOGO, usando expresiones como\n" +
-      '  \"de nuestro catálogo de SUV\", \"de nuestro catálogo de vehículos\" o similares.\n' +
-      "- Siempre que tenga sentido, puedes empezar la respuesta con una frase del estilo:\n" +
-      '  \"Te recomiendo X opciones de nuestro catálogo de SUV que se ajustan a tu presupuesto de Y euros:\".\n' +
-      "- Si el listado NO está vacío, está TERMINANTEMENTE PROHIBIDO decir frases como\n" +
-      '  \"no tengo acceso a información actualizada\" o similares. En su lugar, recomienda modelos concretos del catálogo.\n' +
-      "- Si el listado está vacío, explícale al usuario que ahora mismo no hay coches que cumplan sus filtros y sugiérele cambios razonables (más presupuesto, otra categoría, etc.).\n" +
-      "- Para mostrar la imagen de un coche, usa la sintaxis Markdown: `![Nombre del coche](URL_DE_mainImage)`.\n";
+      "- Cada coche tiene un campo 'mainImage' (URL de imagen) y opcionalmente 'productLink' (URL de la ficha en la web).\n" +
+      "- Si SOLO hay 1 coche en la lista y ese coche tiene 'productLink', añade al final de la respuesta una línea con un enlace Markdown:\n" +
+      "  [Ver este coche en nuestra web](PRODUCT_LINK_AQUI)\n" +
+      "- Ese enlace debe apuntar exactamente al valor de 'productLink'.\n" +
+      "- Si hay varios coches, puedes no mostrar enlaces o mostrar uno por coche, según lo veas más útil.\n" +
+      "- No digas que no tienes acceso a información actualizada si el JSON contiene resultados.\n";
 
     const userContent =
       `Pregunta del usuario:\n` +

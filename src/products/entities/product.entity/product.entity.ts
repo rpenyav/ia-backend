@@ -80,6 +80,9 @@ export class Product {
   @CreateDateColumn({ type: "datetime" })
   createdAt: Date;
 
+  @Column({ length: 500, nullable: true })
+  productLink?: string;
+
   @UpdateDateColumn({ type: "datetime" })
   updatedAt: Date;
 }
