@@ -10,10 +10,6 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   // CORS
-  const allowedOrigins = (process.env.ALLOWED_ORIGINS || "")
-    .split(",")
-    .map((o) => o.trim())
-    .filter((o) => o.length > 0);
 
   // app.enableCors({
   //   origin: allowedOrigins.length > 0 ? allowedOrigins : true,
