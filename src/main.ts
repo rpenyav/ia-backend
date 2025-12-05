@@ -10,7 +10,10 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   // CORS
-
+  const allowedOrigins = (process.env.ALLOWED_ORIGINS || "")
+    .split(",")
+    .map((o) => o.trim())
+    .filter((o) => o.length > 0);
   // app.enableCors({
   //   origin: allowedOrigins.length > 0 ? allowedOrigins : true,
   //   methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
@@ -19,34 +22,13 @@ async function bootstrap() {
   // });
 
   // CORS
-  const allowedOrigins = (process.env.ALLOWED_ORIGINS || "")
-    .split(",")
-    .map((o) => o.trim())
-    .filter((o) => o.length > 0);
 
   app.enableCors({
-    origin: (origin, callback) => {
-      // llamadas server-to-server o desde curl (sin Origin)
-      if (!origin) {
-        return callback(null, true);
-      }
-
-      // si no has definido ALLOWED_ORIGINS, permite todo (modo dev)
-      if (allowedOrigins.length === 0) {
-        return callback(null, true);
-      }
-
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-
-      // origen no permitido
-      return callback(new Error(`Origin ${origin} not allowed by CORS`), false);
-    },
+    origin: true, // 👈 permite cualquier origen, devuelve el mismo Origin que llega
     methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
     allowedHeaders: "Content-Type, Authorization, x-api-key",
     credentials: true,
-  });
+  }); // 👇 Vistas: src/views desde la raíz del proyecto
 
   // 👇 Vistas: src/views desde la raíz del proyecto
   const viewsPath = join(process.cwd(), "src", "views");
