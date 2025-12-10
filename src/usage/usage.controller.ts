@@ -1,13 +1,34 @@
-// src/usage/usage.controller.ts
-import { Controller, Get, Param } from "@nestjs/common";
+import { Controller, Get, Param, Query } from "@nestjs/common";
 import { UsageService } from "./usage.service";
 
 @Controller("usage")
 export class UsageController {
   constructor(private readonly usageService: UsageService) {}
 
-  // GET /usage → últimos registros (hasta 1000)
+  /**
+   * GET /usage?page=1&pageSize=10
+   * Devuelve:
+   * {
+   *   pageSize,
+   *   pageNumber,
+   *   totalRegisters,
+   *   list: [...]
+   * }
+   */
   @Get()
+  async findPaginated(
+    @Query("page") pageStr?: string,
+    @Query("pageSize") pageSizeStr?: string
+  ) {
+    const page = pageStr ? parseInt(pageStr, 10) : 1;
+    const pageSize = pageSizeStr ? parseInt(pageSizeStr, 10) : 10;
+
+    return this.usageService.findPaginated(page, pageSize);
+  }
+
+  // Si quieres seguir teniendo el endpoint "sin paginar" (opcional):
+  // GET /usage/all
+  @Get("all/raw")
   findAll() {
     return this.usageService.findAll();
   }

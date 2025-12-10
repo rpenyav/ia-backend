@@ -1,4 +1,3 @@
-// src/usage/usage.service.ts
 import { Injectable, Optional } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
@@ -99,7 +98,7 @@ export class UsageService {
     }
   }
 
-  // --- Endpoints básicos de lectura para el controller ---
+  // --- Endpoints básicos de lectura (sin paginar) ---
 
   async findAll(): Promise<any[]> {
     if (this.useMongo) {
@@ -165,18 +164,28 @@ export class UsageService {
     }
   }
 
+  /**
+   * Listado paginado /usage
+   * Devuelve el formato estándar:
+   * {
+   *   pageSize,
+   *   pageNumber,
+   *   totalRegisters,
+   *   list: [...Usage]
+   * }
+   */
   async findPaginated(
     page: number,
-    limit: number
+    pageSize: number
   ): Promise<{
-    items: any[];
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
+    pageSize: number;
+    pageNumber: number;
+    totalRegisters: number;
+    list: any[];
   }> {
-    const safePage = page < 1 ? 1 : page;
-    const skip = (safePage - 1) * limit;
+    const safePage = page && page > 0 ? page : 1;
+    const safePageSize = pageSize && pageSize > 0 ? pageSize : 10;
+    const skip = (safePage - 1) * safePageSize;
 
     if (this.useMongo) {
       if (!this.usageModel) {
@@ -188,20 +197,17 @@ export class UsageService {
           .find()
           .sort({ createdAt: -1 })
           .skip(skip)
-          .limit(limit)
+          .limit(safePageSize)
           .lean()
           .exec(),
         this.usageModel.countDocuments().exec(),
       ]);
 
-      const totalPages = total === 0 ? 1 : Math.ceil(total / limit);
-
       return {
-        items,
-        total,
-        page: safePage,
-        limit,
-        totalPages,
+        pageSize: safePageSize,
+        pageNumber: safePage,
+        totalRegisters: total,
+        list: items,
       };
     } else {
       if (!this.usageRepo) {
@@ -211,17 +217,14 @@ export class UsageService {
       const [items, total] = await this.usageRepo.findAndCount({
         order: { createdAt: "DESC" },
         skip,
-        take: limit,
+        take: safePageSize,
       });
 
-      const totalPages = total === 0 ? 1 : Math.ceil(total / limit);
-
       return {
-        items,
-        total,
-        page: safePage,
-        limit,
-        totalPages,
+        pageSize: safePageSize,
+        pageNumber: safePage,
+        totalRegisters: total,
+        list: items,
       };
     }
   }
