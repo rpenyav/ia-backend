@@ -36,10 +36,31 @@ export class CategoriesService {
     return this.categoriesRepo.save(category);
   }
 
+  /**
+   * Listado completo (sin paginar) – si lo necesitas en algún sitio.
+   */
   findAll(): Promise<VehicleCategory[]> {
     return this.categoriesRepo.find({
       order: { name: "ASC" },
     });
+  }
+
+  /**
+   * Listado paginado para el backoffice.
+   */
+  async findAllPaginated(
+    page: number,
+    pageSize: number
+  ): Promise<{ items: VehicleCategory[]; total: number }> {
+    const skip = (page - 1) * pageSize;
+
+    const [items, total] = await this.categoriesRepo.findAndCount({
+      order: { name: "ASC" },
+      skip,
+      take: pageSize,
+    });
+
+    return { items, total };
   }
 
   async findOne(id: number): Promise<VehicleCategory> {

@@ -9,6 +9,7 @@ import {
   Delete,
   Req,
   UseGuards,
+  Query,
 } from "@nestjs/common";
 import { ConversationsService } from "./conversations.service";
 import { CreateConversationDto } from "./dto/create-conversation.dto";
@@ -34,14 +35,28 @@ export class ConversationsController {
   }
 
   @Get()
-  async findAll(@Req() req: any): Promise<PaginatedResult<any>> {
+  async findAll(
+    @Req() req: any,
+    @Query("page") pageStr?: string,
+    @Query("pageSize") pageSizeStr?: string
+  ): Promise<PaginatedResult<any>> {
     const userId = req.user?.userId || req.user?.sub;
-    const items = await this.conversationsService.findAllForUser(userId);
+
+    const page = Math.max(parseInt(pageStr || "1", 10) || 1, 1);
+    const rawPageSize = Math.max(parseInt(pageSizeStr || "10", 10) || 10, 1);
+    const pageSize = Math.min(rawPageSize, 100);
+
+    const { items, total } =
+      await this.conversationsService.findAllForUserPaginated(
+        userId,
+        page,
+        pageSize
+      );
 
     return {
-      pageSize: items.length,
-      pageNumber: 1,
-      totalRegisters: items.length,
+      pageSize,
+      pageNumber: page,
+      totalRegisters: total,
       list: items,
     };
   }

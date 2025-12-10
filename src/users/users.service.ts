@@ -86,6 +86,9 @@ export class UsersService {
     });
   }
 
+  /**
+   * Listado completo sin paginar.
+   */
   async findAll(): Promise<any[]> {
     if (this.useMongo) {
       if (!this.userModel) {
@@ -97,6 +100,46 @@ export class UsersService {
         throw new Error("UserRepository no está disponible (DB_DRIVER no SQL)");
       }
       return this.usersRepo.find();
+    }
+  }
+
+  /**
+   * Listado paginado para backoffice.
+   */
+  async findAllPaginated(
+    page: number,
+    pageSize: number
+  ): Promise<{ items: any[]; total: number }> {
+    const skip = (page - 1) * pageSize;
+
+    if (this.useMongo) {
+      if (!this.userModel) {
+        throw new Error("UserMongoModel no disponible (DB_DRIVER no mongodb)");
+      }
+
+      const [items, total] = await Promise.all([
+        this.userModel
+          .find()
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(pageSize)
+          .exec(),
+        this.userModel.countDocuments().exec(),
+      ]);
+
+      return { items, total };
+    } else {
+      if (!this.usersRepo) {
+        throw new Error("UserRepository no está disponible (DB_DRIVER no SQL)");
+      }
+
+      const [items, total] = await this.usersRepo.findAndCount({
+        order: { email: "ASC" },
+        skip,
+        take: pageSize,
+      });
+
+      return { items, total };
     }
   }
 

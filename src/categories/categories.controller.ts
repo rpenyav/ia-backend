@@ -8,6 +8,7 @@ import {
   Patch,
   Post,
   ParseIntPipe,
+  Query,
 } from "@nestjs/common";
 import { CategoriesService } from "./categories.service";
 import { CreateCategoryDto } from "./dto/create-category.dto/create-category.dto";
@@ -31,12 +32,23 @@ export class CategoriesController {
   }
 
   @Get()
-  async findAll(): Promise<PaginatedResult<VehicleCategory>> {
-    const items = await this.categoriesService.findAll();
+  async findAll(
+    @Query("page") pageStr?: string,
+    @Query("pageSize") pageSizeStr?: string
+  ): Promise<PaginatedResult<VehicleCategory>> {
+    const page = Math.max(parseInt(pageStr || "1", 10) || 1, 1);
+    const rawPageSize = Math.max(parseInt(pageSizeStr || "10", 10) || 10, 1);
+    const pageSize = Math.min(rawPageSize, 100); // límite de seguridad
+
+    const { items, total } = await this.categoriesService.findAllPaginated(
+      page,
+      pageSize
+    );
+
     return {
-      pageSize: items.length,
-      pageNumber: 1,
-      totalRegisters: items.length,
+      pageSize,
+      pageNumber: page,
+      totalRegisters: total,
       list: items,
     };
   }

@@ -21,15 +21,6 @@ export interface ChatProductSearchFilters {
   limit?: number;
 }
 
-export interface ChatProductSearchFilters {
-  categorySlug?: string;
-  brand?: string;
-  fuelType?: string;
-  gearbox?: string;
-  maxPrice?: number;
-  limit?: number;
-}
-
 @Injectable()
 export class ProductsService {
   constructor(
@@ -55,11 +46,33 @@ export class ProductsService {
     return this.productsRepo.save(product);
   }
 
+  /**
+   * Listado completo (sin paginar) – si lo necesitas.
+   */
   findAll(): Promise<Product[]> {
     return this.productsRepo.find({
       where: { active: true },
       order: { createdAt: "DESC" },
     });
+  }
+
+  /**
+   * Listado paginado para backoffice.
+   */
+  async findAllPaginated(
+    page: number,
+    pageSize: number
+  ): Promise<{ items: Product[]; total: number }> {
+    const skip = (page - 1) * pageSize;
+
+    const [items, total] = await this.productsRepo.findAndCount({
+      where: { active: true },
+      order: { createdAt: "DESC" },
+      skip,
+      take: pageSize,
+    });
+
+    return { items, total };
   }
 
   async findOne(id: string): Promise<Product> {

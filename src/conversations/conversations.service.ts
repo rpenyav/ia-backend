@@ -98,6 +98,52 @@ export class ConversationsService {
     }
   }
 
+  /**
+   * Listado paginado de conversaciones por usuario (para backoffice o UI).
+   */
+  async findAllForUserPaginated(
+    userId: string,
+    page: number,
+    pageSize: number
+  ): Promise<{ items: any[]; total: number }> {
+    const skip = (page - 1) * pageSize;
+
+    if (this.useMongo) {
+      if (!this.convModel) {
+        throw new Error(
+          "ConversationMongoModel no disponible (DB_DRIVER no mongodb)"
+        );
+      }
+
+      const [items, total] = await Promise.all([
+        this.convModel
+          .find({ userId })
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(pageSize)
+          .exec(),
+        this.convModel.countDocuments({ userId }).exec(),
+      ]);
+
+      return { items, total };
+    } else {
+      if (!this.convRepo) {
+        throw new Error(
+          "ConversationRepository no está disponible (DB_DRIVER no SQL)"
+        );
+      }
+
+      const [items, total] = await this.convRepo.findAndCount({
+        where: { user: { id: userId } as any },
+        order: { createdAt: "DESC" },
+        skip,
+        take: pageSize,
+      });
+
+      return { items, total };
+    }
+  }
+
   async findOneForUser(id: string, userId: string): Promise<any | null> {
     if (this.useMongo) {
       if (!this.convModel || !this.msgModel) {
