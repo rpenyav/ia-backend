@@ -1,157 +1,80 @@
-// src/products/products.service.ts
+// src/products/products.controller.ts
 import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
 } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { VehicleCategory } from "src/categories/entities/vehicle-category.entity/vehicle-category.entity";
-import { Repository } from "typeorm";
-import { v4 as uuid } from "uuid";
+import { ProductsService } from "./products.service";
 import { CreateProductDto } from "./dto/create-product.dto/create-product.dto";
 import { UpdateProductDto } from "./dto/update-product.dto/update-product.dto";
-import { Product } from "./entities/product.entity/product.entity";
 
-export interface ChatProductSearchFilters {
-  categorySlug?: string;
-  brand?: string;
-  fuelType?: string;
-  gearbox?: string;
-  maxPrice?: number;
-  limit?: number;
-}
+@Controller("products")
+export class ProductsController {
+  constructor(private readonly productsService: ProductsService) {}
 
-@Injectable()
-export class ProductsService {
-  constructor(
-    @InjectRepository(Product)
-    private readonly productsRepo: Repository<Product>,
-    @InjectRepository(VehicleCategory)
-    private readonly categoriesRepo: Repository<VehicleCategory>
-  ) {}
-
-  async create(dto: CreateProductDto): Promise<Product> {
-    const category = await this.categoriesRepo.findOne({
-      where: { id: dto.vehicleCategoryId },
-    });
-    if (!category) {
-      throw new BadRequestException("Invalid vehicleCategoryId");
-    }
-
-    const product = this.productsRepo.create({
-      id: uuid(),
-      ...dto,
-    });
-
-    return this.productsRepo.save(product);
+  @Post()
+  create(@Body() dto: CreateProductDto) {
+    return this.productsService.create(dto);
   }
 
   /**
-   * Listado completo (sin paginar) – si lo necesitas.
+   * GET /products
+   * Devuelve: { pageSize, pageNumber, totalRegisters, list: [] }
    */
-  findAll(): Promise<Product[]> {
-    return this.productsRepo.find({
-      where: { active: true },
-      order: { createdAt: "DESC" },
-    });
+  @Get()
+  async findAll(
+    @Query("page") pageRaw?: string,
+    @Query("pageSize") pageSizeRaw?: string
+  ) {
+    const pageNumber =
+      pageRaw && !Number.isNaN(Number(pageRaw)) && Number(pageRaw) > 0
+        ? Number(pageRaw)
+        : 1;
+
+    const pageSize =
+      pageSizeRaw &&
+      !Number.isNaN(Number(pageSizeRaw)) &&
+      Number(pageSizeRaw) > 0
+        ? Number(pageSizeRaw)
+        : 10;
+
+    const { items, total } = await this.productsService.findAllPaginated(
+      pageNumber,
+      pageSize
+    );
+
+    return {
+      pageSize,
+      pageNumber,
+      totalRegisters: total,
+      list: items,
+    };
   }
 
-  /**
-   * Listado paginado para backoffice.
-   */
-  async findAllPaginated(
-    page: number,
-    pageSize: number
-  ): Promise<{ items: Product[]; total: number }> {
-    const skip = (page - 1) * pageSize;
-
-    const [items, total] = await this.productsRepo.findAndCount({
-      where: { active: true },
-      order: { createdAt: "DESC" },
-      skip,
-      take: pageSize,
-    });
-
-    return { items, total };
+  // 🔹 GET /products/slug/:slug
+  @Get("slug/:slug")
+  findBySlug(@Param("slug") slug: string) {
+    return this.productsService.findBySlug(slug);
   }
 
-  async findOne(id: string): Promise<Product> {
-    const product = await this.productsRepo.findOne({ where: { id } });
-    if (!product) {
-      throw new NotFoundException("Product not found");
-    }
-    return product;
+  // GET /products/:id (UUID)
+  @Get(":id")
+  findOne(@Param("id") id: string) {
+    return this.productsService.findOne(id);
   }
 
-  // 🔹 NUEVO: buscar producto por slug
-  async findBySlug(slug: string): Promise<Product> {
-    const product = await this.productsRepo.findOne({ where: { slug } });
-    if (!product) {
-      throw new NotFoundException("Product not found");
-    }
-    return product;
+  @Patch(":id")
+  update(@Param("id") id: string, @Body() dto: UpdateProductDto) {
+    return this.productsService.update(id, dto);
   }
 
-  async update(id: string, dto: UpdateProductDto): Promise<Product> {
-    const product = await this.findOne(id);
-
-    if (dto.vehicleCategoryId) {
-      const category = await this.categoriesRepo.findOne({
-        where: { id: dto.vehicleCategoryId },
-      });
-      if (!category) {
-        throw new BadRequestException("Invalid vehicleCategoryId");
-      }
-    }
-
-    Object.assign(product, dto);
-    return this.productsRepo.save(product);
-  }
-
-  async remove(id: string): Promise<void> {
-    const product = await this.findOne(id);
-    await this.productsRepo.remove(product);
-  }
-
-  async searchForChat(
-    filters: ChatProductSearchFilters = {}
-  ): Promise<Product[]> {
-    const {
-      categorySlug,
-      brand,
-      fuelType,
-      gearbox,
-      maxPrice,
-      limit = 5,
-    } = filters;
-
-    const qb = this.productsRepo
-      .createQueryBuilder("p")
-      .leftJoinAndSelect("p.vehicleCategory", "c")
-      .where("p.active = :active", { active: true });
-
-    if (categorySlug) {
-      qb.andWhere("c.slug = :categorySlug", { categorySlug });
-    }
-
-    if (brand) {
-      qb.andWhere("p.brand LIKE :brand", { brand: `%${brand}%` });
-    }
-
-    if (fuelType) {
-      qb.andWhere("p.fuelType = :fuelType", { fuelType });
-    }
-
-    if (gearbox) {
-      qb.andWhere("p.gearbox = :gearbox", { gearbox });
-    }
-
-    if (maxPrice) {
-      qb.andWhere("p.price <= :maxPrice", { maxPrice });
-    }
-
-    qb.orderBy("p.price", "ASC").limit(limit);
-
-    return qb.getMany();
+  @Delete(":id")
+  remove(@Param("id") id: string) {
+    return this.productsService.remove(id);
   }
 }
