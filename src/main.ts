@@ -15,15 +15,15 @@ async function bootstrap() {
     .split(",")
     .map((o) => o.trim())
     .filter((o) => o.length > 0)
-    .map((o) => o.replace(/\/$/, "")); // sin barra final
+    .map((o) => o.replace(/\/$/, "")); // quitar barra final
 
   console.log("[CORS] ALLOWED_ORIGINS:", allowedOrigins);
 
   app.enableCors({
     origin: (origin, callback) => {
-      // peticiones sin Origin (curl, Postman...)
+      // Peticiones sin Origin (Postman, curl, SSR, etc.)
       if (!origin) {
-        console.log("[CORS] Petición sin Origin, se permite");
+        console.log("[CORS] Petición sin Origin -> permitido");
         return callback(null, true);
       }
 
@@ -48,7 +48,7 @@ async function bootstrap() {
       return callback(new Error("Not allowed by CORS"), false);
     },
     methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
-    allowedHeaders: "Content-Type, Authorization, x-api-key",
+    allowedHeaders: "*", // más permisivo para evitar líos con headers custom
     credentials: true,
   });
 
