@@ -11,6 +11,14 @@ import {
 import { ProductsService } from "./products.service";
 import { CreateProductDto } from "./dto/create-product.dto/create-product.dto";
 import { UpdateProductDto } from "./dto/update-product.dto/update-product.dto";
+import { Product } from "./entities/product.entity/product.entity";
+
+interface PaginatedResult<T> {
+  pageSize: number;
+  pageNumber: number;
+  totalRegisters: number;
+  list: T[];
+}
 
 @Controller("products")
 export class ProductsController {
@@ -22,8 +30,14 @@ export class ProductsController {
   }
 
   @Get()
-  findAll() {
-    return this.productsService.findAll();
+  async findAll(): Promise<PaginatedResult<Product>> {
+    const items = await this.productsService.findAll();
+    return {
+      pageSize: items.length,
+      pageNumber: 1,
+      totalRegisters: items.length,
+      list: items,
+    };
   }
 
   // 🔹 GET /products/slug/:slug

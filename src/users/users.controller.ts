@@ -15,6 +15,13 @@ import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 
+interface PaginatedResult<T> {
+  pageSize: number;
+  pageNumber: number;
+  totalRegisters: number;
+  list: T[];
+}
+
 @Controller("users")
 @UseGuards(JwtAuthGuard) // 👈 TODOS los endpoints de /users requieren token
 export class UsersController {
@@ -26,8 +33,14 @@ export class UsersController {
   }
 
   @Get()
-  findAll() {
-    return this.usersService.findAll();
+  async findAll(): Promise<PaginatedResult<any>> {
+    const items = await this.usersService.findAll();
+    return {
+      pageSize: items.length,
+      pageNumber: 1,
+      totalRegisters: items.length,
+      list: items,
+    };
   }
 
   @Get(":id")

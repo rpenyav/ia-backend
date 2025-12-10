@@ -15,6 +15,13 @@ import { CreateConversationDto } from "./dto/create-conversation.dto";
 import { UpdateConversationDto } from "./dto/update-conversation.dto";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 
+interface PaginatedResult<T> {
+  pageSize: number;
+  pageNumber: number;
+  totalRegisters: number;
+  list: T[];
+}
+
 @Controller("conversations")
 @UseGuards(JwtAuthGuard) // 🔒 todas las rutas requieren Bearer token
 export class ConversationsController {
@@ -27,9 +34,16 @@ export class ConversationsController {
   }
 
   @Get()
-  findAll(@Req() req: any) {
+  async findAll(@Req() req: any): Promise<PaginatedResult<any>> {
     const userId = req.user?.userId || req.user?.sub;
-    return this.conversationsService.findAllForUser(userId);
+    const items = await this.conversationsService.findAllForUser(userId);
+
+    return {
+      pageSize: items.length,
+      pageNumber: 1,
+      totalRegisters: items.length,
+      list: items,
+    };
   }
 
   @Get(":id")

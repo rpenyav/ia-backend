@@ -12,6 +12,14 @@ import {
 import { CategoriesService } from "./categories.service";
 import { CreateCategoryDto } from "./dto/create-category.dto/create-category.dto";
 import { UpdateCategoryDto } from "./dto/update-category.dto/update-category.dto";
+import { VehicleCategory } from "./entities/vehicle-category.entity/vehicle-category.entity";
+
+interface PaginatedResult<T> {
+  pageSize: number;
+  pageNumber: number;
+  totalRegisters: number;
+  list: T[];
+}
 
 @Controller("categories")
 export class CategoriesController {
@@ -23,8 +31,14 @@ export class CategoriesController {
   }
 
   @Get()
-  findAll() {
-    return this.categoriesService.findAll();
+  async findAll(): Promise<PaginatedResult<VehicleCategory>> {
+    const items = await this.categoriesService.findAll();
+    return {
+      pageSize: items.length,
+      pageNumber: 1,
+      totalRegisters: items.length,
+      list: items,
+    };
   }
 
   @Get(":id")
