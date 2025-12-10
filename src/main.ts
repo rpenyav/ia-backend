@@ -9,7 +9,7 @@ import * as cookieParser from "cookie-parser";
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  // 🔹 Leer y normalizar ALLOWED_ORIGINS
+  // --- CORS: versión sencilla y robusta para dev ---
   const raw = process.env.ALLOWED_ORIGINS || "";
   const allowedOrigins = raw
     .split(",")
@@ -21,37 +21,44 @@ async function bootstrap() {
 
   app.enableCors({
     origin: (origin, callback) => {
-      // Peticiones sin Origin (Postman, curl, SSR, etc.)
+      // Peticiones sin Origin (Postman, curl, etc.) → permitir
       if (!origin) {
         console.log("[CORS] Petición sin Origin -> permitido");
         return callback(null, true);
       }
 
-      const normalizedOrigin = origin.replace(/\/$/, "");
+      const normalized = origin.replace(/\/$/, "");
       const isAllowed =
-        allowedOrigins.length === 0 ||
-        allowedOrigins.includes(normalizedOrigin);
+        allowedOrigins.length === 0 || allowedOrigins.includes(normalized);
 
       console.log(
         "[CORS] Origin recibido:",
         origin,
         "=> normalizado:",
-        normalizedOrigin,
+        normalized,
         "=> permitido:",
         isAllowed
       );
 
       if (isAllowed) {
+        // ✅ devolvemos true → el middleware cors echa atrás el mismo Origin
         return callback(null, true);
       }
 
+      console.warn(
+        "[CORS] Origin NO permitido:",
+        origin,
+        "Lista:",
+        allowedOrigins
+      );
       return callback(new Error("Not allowed by CORS"), false);
     },
     methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
-    allowedHeaders: "*", // más permisivo para evitar líos con headers custom
+    allowedHeaders: "*",
     credentials: true,
   });
 
+  // Vistas
   const viewsPath = join(process.cwd(), "src", "views");
   console.log("Views dir:", viewsPath);
 
