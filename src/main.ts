@@ -9,28 +9,49 @@ import * as cookieParser from "cookie-parser";
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  // CORS
-  const allowedOrigins = (process.env.ALLOWED_ORIGINS || "")
+  // 🔹 Leer y normalizar ALLOWED_ORIGINS
+  const raw = process.env.ALLOWED_ORIGINS || "";
+  const allowedOrigins = raw
     .split(",")
     .map((o) => o.trim())
-    .filter((o) => o.length > 0);
-  // app.enableCors({
-  //   origin: allowedOrigins.length > 0 ? allowedOrigins : true,
-  //   methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
-  //   allowedHeaders: "Content-Type, Authorization, x-api-key",
-  //   credentials: true,
-  // });
+    .filter((o) => o.length > 0)
+    .map((o) => o.replace(/\/$/, "")); // sin barra final
 
-  // CORS
+  console.log("[CORS] ALLOWED_ORIGINS:", allowedOrigins);
 
   app.enableCors({
-    origin: true, // 👈 permite cualquier origen, devuelve el mismo Origin que llega
+    origin: (origin, callback) => {
+      // peticiones sin Origin (curl, Postman...)
+      if (!origin) {
+        console.log("[CORS] Petición sin Origin, se permite");
+        return callback(null, true);
+      }
+
+      const normalizedOrigin = origin.replace(/\/$/, "");
+      const isAllowed =
+        allowedOrigins.length === 0 ||
+        allowedOrigins.includes(normalizedOrigin);
+
+      console.log(
+        "[CORS] Origin recibido:",
+        origin,
+        "=> normalizado:",
+        normalizedOrigin,
+        "=> permitido:",
+        isAllowed
+      );
+
+      if (isAllowed) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("Not allowed by CORS"), false);
+    },
     methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
     allowedHeaders: "Content-Type, Authorization, x-api-key",
     credentials: true,
-  }); // 👇 Vistas: src/views desde la raíz del proyecto
+  });
 
-  // 👇 Vistas: src/views desde la raíz del proyecto
   const viewsPath = join(process.cwd(), "src", "views");
   console.log("Views dir:", viewsPath);
 
@@ -38,12 +59,11 @@ async function bootstrap() {
   app.setViewEngine("hbs");
 
   app.useStaticAssets(join(process.cwd(), "public"), {
-    prefix: "/static/", // URL base de los estáticos
+    prefix: "/static/",
   });
 
   app.use(cookieParser(process.env.JWT_SECRET || "dev_cookie_secret"));
 
-  // Validación global
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -56,4 +76,5 @@ async function bootstrap() {
   await app.listen(port, "0.0.0.0");
   console.log(`🚀 App listening on port ${port}`);
 }
+
 bootstrap();
