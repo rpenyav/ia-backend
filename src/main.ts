@@ -9,56 +9,46 @@ import * as cookieParser from "cookie-parser";
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  // --- CORS: versión sencilla y robusta para dev ---
-  const raw = process.env.ALLOWED_ORIGINS || "";
-  const allowedOrigins = raw
+  // =========================
+  // CORS
+  // =========================
+  const allowedOrigins = (process.env.ALLOWED_ORIGINS || "")
     .split(",")
     .map((o) => o.trim())
-    .filter((o) => o.length > 0)
-    .map((o) => o.replace(/\/$/, "")); // quitar barra final
+    .filter((o) => o.length > 0);
+
+  const allowedHeaders = [
+    "Content-Type",
+    "Authorization", // 👈 IMPORTANTE para el Bearer token
+    "x-api-key",
+  ];
 
   console.log("[CORS] ALLOWED_ORIGINS:", allowedOrigins);
+  console.log("[CORS] ALLOWED_HEADERS:", allowedHeaders);
 
   app.enableCors({
-    origin: (origin, callback) => {
-      // Peticiones sin Origin (Postman, curl, etc.) → permitir
-      if (!origin) {
-        console.log("[CORS] Petición sin Origin -> permitido");
-        return callback(null, true);
-      }
+    origin:
+      allowedOrigins.length > 0
+        ? (origin, callback) => {
+            // peticiones sin origin (ej. curl, Postman) → OK
+            if (!origin) return callback(null, true);
 
-      const normalized = origin.replace(/\/$/, "");
-      const isAllowed =
-        allowedOrigins.length === 0 || allowedOrigins.includes(normalized);
+            if (allowedOrigins.includes(origin)) {
+              return callback(null, true);
+            }
 
-      console.log(
-        "[CORS] Origin recibido:",
-        origin,
-        "=> normalizado:",
-        normalized,
-        "=> permitido:",
-        isAllowed
-      );
-
-      if (isAllowed) {
-        // ✅ devolvemos true → el middleware cors echa atrás el mismo Origin
-        return callback(null, true);
-      }
-
-      console.warn(
-        "[CORS] Origin NO permitido:",
-        origin,
-        "Lista:",
-        allowedOrigins
-      );
-      return callback(new Error("Not allowed by CORS"), false);
-    },
+            console.warn("[CORS] Origin no permitido:", origin);
+            return callback(null, false);
+          }
+        : true, // si no hay lista, permite todos
     methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
-    allowedHeaders: "*",
+    allowedHeaders, // 👈 aquí va Authorization
     credentials: true,
   });
 
-  // Vistas
+  // =========================
+  // Vistas estáticas / hbs
+  // =========================
   const viewsPath = join(process.cwd(), "src", "views");
   console.log("Views dir:", viewsPath);
 
@@ -71,6 +61,7 @@ async function bootstrap() {
 
   app.use(cookieParser(process.env.JWT_SECRET || "dev_cookie_secret"));
 
+  // Validación global
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -83,5 +74,4 @@ async function bootstrap() {
   await app.listen(port, "0.0.0.0");
   console.log(`🚀 App listening on port ${port}`);
 }
-
 bootstrap();
